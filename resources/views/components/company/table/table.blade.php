@@ -23,7 +23,7 @@
                 <tr>
                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Nama Perusahaan</th>
-                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Jenis</th>
+                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Deskripsi</th>
                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -75,15 +75,15 @@
                         required>
                 </div>
                 
-                <!-- Jenis -->
+                <!-- Type -->
                 <div>
                     <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.5rem;">
-                        Jenis Perusahaan <span style="color: #ef4444;">*</span>
+                        Type Company <span style="color: #ef4444;">*</span>
                     </label>
                     <select name="company_type_id" 
                             style="width: 100%; background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 0.875rem;" 
                             required>
-                        <option value="">-- Pilih Jenis --</option>
+                        <option value="">-- Pilih Type --</option>
                         @foreach($types as $type)
                         <option value="{{ $type->company_type_id }}">{{ $type->type_name }}</option>
                         @endforeach
@@ -183,16 +183,16 @@
                         required>
                 </div>
                 
-                <!-- Jenis -->
+                <!-- Type -->
                 <div>
                     <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.5rem;">
-                        Jenis Perusahaan <span style="color: #ef4444;">*</span>
+                        Type Company <span style="color: #ef4444;">*</span>
                     </label>
                     <select id="edit_company_type_id"
                             name="company_type_id" 
                             style="width: 100%; background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 0.875rem;" 
                             required>
-                        <option value="">-- Pilih Jenis --</option>
+                        <option value="">-- Pilih Type --</option>
                         @foreach($types as $type)
                         <option value="{{ $type->company_type_id }}">{{ $type->type_name }}</option>
                         @endforeach

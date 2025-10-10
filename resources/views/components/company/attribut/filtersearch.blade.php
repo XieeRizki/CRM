@@ -4,7 +4,7 @@
     'ajaxUrl' => null,
 ])
 
-<div class="bg-white rounded-xl shadow-sm p-6 mb-4 border border-gray-200">
+<div class="bg-white rounded-xl shadow-sm p-6 mb-4 border border-gray-200 fade in">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
         <div class="flex flex-wrap items-center gap-4">
             <!-- Search input -->
@@ -18,10 +18,10 @@
                 <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
             </div>
 
-            <!-- Filter Jenis Perusahaan -->
+            <!-- Filter Type Perusahaan -->
             <select id="{{ $tableId }}TypeFilter"
                 class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none">
-                <option value="">Semua Jenis</option>
+                <option value="">Semua Type</option>
                 @foreach($types as $type)
                     <option value="{{ $type->company_type_id }}">{{ $type->type_name }}</option>
                 @endforeach
@@ -48,9 +48,6 @@
     </div>
 </div>
 
-<!-- Pagination Placeholder -->
-<div id="{{ $tableId }}PaginationContainer" class="mt-4"></div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const tableId = '{{ $tableId }}';
@@ -64,7 +61,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Target tbody yang spesifik dengan ID
     const companyTable = document.querySelector('#' + tableId + ' tbody');
-    const paginationContainer = document.getElementById(tableId + 'PaginationContainer');
 
     if (!companyTable) {
         console.error('Table tbody tidak ditemukan untuk ID:', tableId);
@@ -90,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
             type,
             tier,
             status,
-            page,
+            page
         });
 
         fetch(`${ajaxUrl}?${query.toString()}`)
@@ -101,7 +97,6 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.data && data.meta) {
                     renderTable(data.data, data.meta);
-                    renderPagination(data.meta);
                 } else {
                     throw new Error('Format data tidak valid');
                 }
@@ -120,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let rows = '';
         companies.forEach((company, index) => {
-            const rowNum = meta.from + index;
+            const rowNum = (meta.from ?? 1) + index; // nomor urut sesuai pagination Laravel
 
             // Tentukan warna status
             let statusClass = company.status === 'active' 
@@ -169,41 +164,6 @@ document.addEventListener('DOMContentLoaded', function () {
         companyTable.innerHTML = rows;
     }
 
-    function renderPagination(meta) {
-        if (!paginationContainer) return;
-
-        let html = `<div class="flex justify-center flex-wrap gap-1">`;
-
-        if (meta.current_page > 1) {
-            html += `<button class="pagination-link px-3 py-1 border rounded hover:bg-gray-100" data-page="${meta.current_page - 1}">Prev</button>`;
-        }
-
-        // Smart pagination
-        let startPage = Math.max(1, meta.current_page - 3);
-        let endPage = Math.min(meta.last_page, meta.current_page + 3);
-
-        if (startPage > 1) {
-            html += `<button class="pagination-link px-3 py-1 border rounded hover:bg-gray-100" data-page="1">1</button>`;
-            if (startPage > 2) html += `<span class="px-3 py-1">...</span>`;
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            html += `<button class="pagination-link px-3 py-1 border rounded ${i === meta.current_page ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}" data-page="${i}">${i}</button>`;
-        }
-
-        if (endPage < meta.last_page) {
-            if (endPage < meta.last_page - 1) html += `<span class="px-3 py-1">...</span>`;
-            html += `<button class="pagination-link px-3 py-1 border rounded hover:bg-gray-100" data-page="${meta.last_page}">${meta.last_page}</button>`;
-        }
-
-        if (meta.current_page < meta.last_page) {
-            html += `<button class="pagination-link px-3 py-1 border rounded hover:bg-gray-100" data-page="${meta.current_page + 1}">Next</button>`;
-        }
-
-        html += `</div>`;
-        paginationContainer.innerHTML = html;
-    }
-
     // Events
     input?.addEventListener('input', () => {
         clearTimeout(debounceTimer);
@@ -213,16 +173,6 @@ document.addEventListener('DOMContentLoaded', function () {
     typeFilter?.addEventListener('change', () => fetchData(1));
     tierFilter?.addEventListener('change', () => fetchData(1));
     statusFilter?.addEventListener('change', () => fetchData(1));
-
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('pagination-link')) {
-            e.preventDefault();
-            const page = e.target.dataset.page;
-            if (page) {
-                fetchData(parseInt(page));
-            }
-        }
-    });
 
     // Load initial data
     fetchData(1);

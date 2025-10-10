@@ -17,5 +17,5 @@
                 <!-- Customer Table -->
                 <div class="bg-white rounded-xl shadow-sm border">
                     <x-customers.table.table />
-                    <x-customers.attribut.pagination />
+                    <x-globals.pagination />
 @endsection

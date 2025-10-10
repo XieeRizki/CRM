@@ -11,18 +11,15 @@
         :activeCompanies="$activeCompanies"
     />
 
-    <div class="mt-3">
-        <x-company.attribut.filtersearch
+    <!-- Company Table -->
+    <div class="bg-white rounded-xl shadow-sm border mt-3">
+        <div class="p-6">
+            <x-company.attribut.filtersearch
             tableId="companyTable"
             :searchFields="[2,3,4,5]"
             :showRoleFilter="false"
             ajaxUrl="{{ route('companies.search') }}"
-        />
-    </div>
-
-    <!-- Company Table -->
-    <div class="bg-white rounded-xl shadow-sm border mt-3">
-        <div class="p-6">
+            />
             <x-company.table.table :companies="$companies" :types="$types"/>
             <x-globals.pagination :paginator="$companies" />
         </div>
