@@ -111,24 +111,24 @@
                     <td class="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
                         <div class="flex items-center justify-end space-x-2">
                             @if(auth()->user()->canAccess($currentMenuId, 'edit'))
-                            <button onclick='openEditVisitModal({
-                                id: {{ $visit->id }},
-                                salesId: {{ $visit->sales_id }},
-                                customerName: "{{ addslashes($visit->customer_name) }}",
-                                company: "{{ addslashes($visit->company_name ?? '') }}",
-                                provinceId: {{ $visit->province_id }},
-                                regencyId: {{ $visit->regency_id ?? 'null' }},
-                                districtId: {{ $visit->district_id ?? 'null' }},
-                                villageId: {{ $visit->village_id ?? 'null' }},
-                                address: "{{ addslashes($visit->address ?? '') }}",
-                                visitDate: "{{ $visit->visit_date->format('Y-m-d') }}",
-                                purpose: "{{ addslashes($visit->visit_purpose) }}",
-                                followUp: {{ $visit->is_follow_up ? 1 : 0 }}
-                            })'
-                                class="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all duration-150 flex items-center" 
-                                title="Edit Visit">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                            <button 
+                            data-visit-id="{{ $visit->id }}"
+                            data-sales-id="{{ $visit->sales_id }}"
+                            data-customer-name="{{ $visit->customer_name }}"
+                            data-company="{{ $visit->company_name ?? '' }}"
+                            data-province-id="{{ $visit->province_id }}"
+                            data-regency-id="{{ $visit->regency_id ?? '' }}"
+                            data-district-id="{{ $visit->district_id ?? '' }}"
+                            data-village-id="{{ $visit->village_id ?? '' }}"
+                            data-address="{{ $visit->address ?? '' }}"
+                            data-visit-date="{{ $visit->visit_date->format('Y-m-d') }}"
+                            data-purpose="{{ $visit->visit_purpose }}"
+                            data-follow-up="{{ $visit->is_follow_up ? 1 : 0 }}"
+                            onclick="openEditVisitModalFromButton(this)"
+                            class="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all duration-150 flex items-center" 
+                            title="Edit Visit">
+                            <i class="fas fa-edit"></i>
+                        </button>
                             @endif
                             
                             @if(auth()->user()->canAccess($currentMenuId, 'delete'))

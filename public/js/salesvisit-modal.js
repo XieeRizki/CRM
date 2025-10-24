@@ -55,135 +55,159 @@ function closeVisitModal() {
 let editVisitCascade = null;
 let currentEditData = null;
 
+function openEditVisitModalFromButton(button) {
+    const visitData = {
+        id: button.getAttribute('data-visit-id'),
+        salesId: button.getAttribute('data-sales-id'),
+        customerName: button.getAttribute('data-customer-name'),
+        company: button.getAttribute('data-company'),
+        provinceId: button.getAttribute('data-province-id'),
+        regencyId: button.getAttribute('data-regency-id') || null,
+        districtId: button.getAttribute('data-district-id') || null,
+        villageId: button.getAttribute('data-village-id') || null,
+        address: button.getAttribute('data-address'),
+        visitDate: button.getAttribute('data-visit-date'),
+        purpose: button.getAttribute('data-purpose'),
+        followUp: parseInt(button.getAttribute('data-follow-up'))
+    };
+    
+    openEditVisitModal(visitData);
+}
+
 function openEditVisitModal(visitData) {
     console.log('Opening Edit Visit Modal:', visitData);
 
-    // Show modal
-    const modal = document.getElementById('editVisitModal');
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-
-    // Set form action
-    const form = document.getElementById('editVisitForm');
-    form.action = `/salesvisit/${visitData.id}`;
-
-    // Set basic fields
-    document.getElementById('editVisitId').value = visitData.id || '';
-    document.getElementById('editCustomerName').value = visitData.customerName || '';
-    document.getElementById('editCompany').value = visitData.company || '';
-    document.getElementById('editAddress').value = visitData.address || '';
-    document.getElementById('editVisitDate').value = visitData.visitDate || '';
-    document.getElementById('editPurpose').value = visitData.purpose || '';
-    
-    // Set follow up radio buttons
-    if (visitData.followUp == 1) {
-        document.getElementById('editFollowUpYes').checked = true;
-    } else {
-        document.getElementById('editFollowUpNo').checked = true;
+    // Validasi data
+    if (!visitData || !visitData.id) {
+        console.error('Invalid visit data:', visitData);
+        showNotification('Data kunjungan tidak valid', 'error');
+        return;
     }
 
-    // Store current data
-    currentEditData = {
-        salesId: visitData.salesId,
-        provinceId: visitData.provinceId,
-        regencyId: visitData.regencyId,
-        districtId: visitData.districtId,
-        villageId: visitData.villageId
-    };
+    try {
+        // Convert string numbers to actual numbers
+        visitData.id = parseInt(visitData.id);
+        visitData.salesId = parseInt(visitData.salesId);
+        visitData.provinceId = parseInt(visitData.provinceId);
+        visitData.regencyId = visitData.regencyId ? parseInt(visitData.regencyId) : null;
+        visitData.districtId = visitData.districtId ? parseInt(visitData.districtId) : null;
+        visitData.villageId = visitData.villageId ? parseInt(visitData.villageId) : null;
+        visitData.followUp = parseInt(visitData.followUp);
 
-    // Load data via AJAX
-    loadEditVisitData(visitData.id);
+        // Show modal
+        const modal = document.getElementById('editVisitModal');
+        if (!modal) {
+            console.error('Edit modal element not found');
+            return;
+        }
+        
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        // Set form action
+        const form = document.getElementById('editVisitForm');
+        if (form) {
+            form.action = `/salesvisit/${visitData.id}`;
+        }
+
+        // Set basic fields dengan null checking
+        document.getElementById('editVisitId').value = visitData.id || '';
+        document.getElementById('editCustomerName').value = visitData.customerName || '';
+        document.getElementById('editCompany').value = visitData.company || '';
+        document.getElementById('editAddress').value = visitData.address || '';
+        document.getElementById('editVisitDate').value = visitData.visitDate || '';
+        document.getElementById('editPurpose').value = visitData.purpose || '';
+        
+        // Set follow up radio buttons
+        if (visitData.followUp == 1) {
+            document.getElementById('editFollowUpYes').checked = true;
+        } else {
+            document.getElementById('editFollowUpNo').checked = true;
+        }
+
+        // Store current data dengan default values
+        currentEditData = {
+            salesId: visitData.salesId || '',
+            provinceId: visitData.provinceId || '',
+            regencyId: visitData.regencyId || null,
+            districtId: visitData.districtId || null,
+            villageId: visitData.villageId || null
+        };
+
+        console.log('Current edit data:', currentEditData);
+
+        // Load data via AJAX untuk mendapatkan sales users dan provinces
+        loadEditVisitData(visitData.id);
+    } catch (error) {
+        console.error('Error opening edit modal:', error);
+        showNotification('Gagal membuka modal edit: ' + error.message, 'error');
+    }
 }
 
 function loadEditVisitData(visitId) {
+    console.log('Loading edit data for visit:', visitId);
+    
+    // Show loading state
     const salesSelect = document.getElementById('editSalesId');
-    const provinceSelect = document.getElementById('edit-province');
-    
-    salesSelect.innerHTML = '<option value="">Loading data sales...</option>';
-    provinceSelect.innerHTML = '<option value="">Loading data provinsi...</option>';
+    salesSelect.innerHTML = '<option value="">Loading...</option>';
+    salesSelect.disabled = true;
 
-    fetch(`/salesvisit/${visitId}/edit`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log('Edit data loaded:', data);
-            if (data.success) {
-                populateEditForm(data);
-            } else {
-                throw new Error('Failed to load edit data');
-            }
-        })
-        .catch(error => {
-            console.error('Error loading edit data:', error);
-            salesSelect.innerHTML = '<option value="">-- Pilih Sales --</option>';
-            provinceSelect.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-            showNotification('Error memuat data untuk edit: ' + error.message, 'error');
-        });
-}
+    // Load sales users dan provinces via AJAX
+    Promise.all([
+        fetch('/users/search?role=sales').then(r => r.json()),
+        fetch('/salesvisit/get-provinces').then(r => r.json())
+    ]).then(([salesData, provincesData]) => {
+        console.log('Sales data:', salesData);
+        console.log('Provinces data:', provincesData);
 
-function populateEditForm(data) {
-    const isSalesRole = document.getElementById('editIsSalesRole').value === '1';
-    
-    // Populate sales dropdown
-    const salesSelect = document.getElementById('editSalesId');
-    salesSelect.innerHTML = '<option value="">-- Pilih Sales --</option>';
-    
-    if (data.salesUsers && Array.isArray(data.salesUsers)) {
-        console.log('Sales users data:', data.salesUsers);
+        // Populate sales dropdown
+        const salesSelect = document.getElementById('editSalesId');
+        salesSelect.innerHTML = '<option value="">Pilih Sales</option>';
         
-        data.salesUsers.forEach(sales => {
-            const option = document.createElement('option');
-            option.value = sales.user_id;
-            option.textContent = `${sales.username} - ${sales.email}`;
-            salesSelect.appendChild(option);
-        });
-        
-        if (currentEditData.salesId) {
-            salesSelect.value = currentEditData.salesId;
-            console.log('Set sales selection to:', currentEditData.salesId);
+        if (salesData && salesData.users) {
+            salesData.users.forEach(sales => {
+                const option = document.createElement('option');
+                option.value = sales.user_id;
+                option.textContent = `${sales.username} - ${sales.email}`;
+                if (sales.user_id == currentEditData.salesId) {
+                    option.selected = true;
+                }
+                salesSelect.appendChild(option);
+            });
         }
-        
-        // 🔒 Jika user adalah sales, disable dropdown
-        if (isSalesRole) {
-            salesSelect.disabled = true;
-            salesSelect.classList.add('bg-gray-100', 'cursor-not-allowed');
-        }
-    } else {
-        console.warn('No sales users data found');
-        salesSelect.innerHTML = '<option value="">Data sales tidak tersedia</option>';
-    }
 
-    // Populate provinces dropdown
-    const provinceSelect = document.getElementById('edit-province');
-    provinceSelect.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-    
-    if (data.provinces && Array.isArray(data.provinces)) {
-        console.log('Provinces data:', data.provinces);
+        // Populate provinces dropdown
+        const provinceSelect = document.getElementById('edit-province');
+        provinceSelect.innerHTML = '<option value="">Pilih Provinsi</option>';
         
-        data.provinces.forEach(province => {
-            const option = document.createElement('option');
-            option.value = province.id;
-            option.textContent = province.name;
-            provinceSelect.appendChild(option);
-        });
-        
-        if (currentEditData.provinceId) {
-            provinceSelect.value = currentEditData.provinceId;
-            console.log('Set province selection to:', currentEditData.provinceId);
-            
-            // Initialize cascade setelah province terisi
-            setTimeout(() => {
-                initEditVisitCascade();
-            }, 100);
+        if (provincesData && provincesData.provinces) {
+            provincesData.provinces.forEach(province => {
+                const option = document.createElement('option');
+                option.value = province.id;
+                option.textContent = province.name;
+                if (province.id == currentEditData.provinceId) {
+                    option.selected = true;
+                }
+                provinceSelect.appendChild(option);
+            });
         }
-    } else {
-        console.warn('No provinces data found');
-        provinceSelect.innerHTML = '<option value="">Data provinsi tidak tersedia</option>';
-    }
+
+        salesSelect.disabled = false;
+        
+        // Initialize cascade setelah data loaded
+        initEditVisitCascade();
+        
+    }).catch(error => {
+        console.error('Error loading edit data:', error);
+        showNotification('Gagal memuat data edit', 'error');
+        
+        // Enable select anyway
+        const salesSelect = document.getElementById('editSalesId');
+        salesSelect.disabled = false;
+        salesSelect.innerHTML = '<option value="">Error loading data</option>';
+        
+        initEditVisitCascade();
+    });
 }
 
 function initEditVisitCascade() {

@@ -312,153 +312,47 @@ class SalesVisitController extends Controller
     /**
      * Remove the specified sales visit
      */
-    public function destroy($id)
-    {
-        $user = Auth::user();
-        $visit = SalesVisit::findOrFail($id);
+  public function destroy($id)
+{
+    $user = Auth::user();
+    
+    try {
+        $visit = SalesVisit::find($id);
+        
+        if (!$visit) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data kunjungan tidak ditemukan!'
+            ], 404);
+        }
 
-        // 🔧 Check permission
+        // Check permission
         $userRoleName = strtolower($user->role->role_name ?? '');
         
-        // 🔹 Sales hanya bisa hapus data miliknya sendiri
+        // Sales hanya bisa hapus data miliknya sendiri
         if ($userRoleName === 'sales' && $visit->sales_id !== $user->user_id) {
-            return redirect()->route('salesvisit')->with('error', 'Anda tidak boleh menghapus data kunjungan milik sales lain.');
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak boleh menghapus data kunjungan milik sales lain.'
+            ], 403);
         }
 
-        try {
-            $visit->delete();
+        $visit->delete();
 
-            if (request()->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Data kunjungan sales berhasil dihapus!'
-                ]);
-            }
+        return response()->json([
+            'success' => true,
+            'message' => 'Data kunjungan sales berhasil dihapus!'
+        ]);
 
-            return redirect()->route('salesvisit')
-                ->with('success', 'Data kunjungan sales berhasil dihapus!');
-        } catch (\Exception $e) {
-            if (request()->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Gagal menghapus data: ' . $e->getMessage()
-                ], 500);
-            }
-
-            return redirect()->back()
-                ->with('error', 'Gagal menghapus data: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * CASCADE DROPDOWN - Get Regencies by Province
-     */
-    public function getRegencies($provinceId)
-    {
-        $regencies = Regency::where('province_id', $provinceId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+    } catch (\Exception $e) {
+        \Log::error('Error deleting sales visit: ' . $e->getMessage());
         
-        return response()->json($regencies);
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal menghapus data: ' . $e->getMessage()
+        ], 500);
     }
-
-    /**
-     * CASCADE DROPDOWN - Get Districts by Regency
-     */
-    public function getDistricts($regencyId)
-    {
-        $districts = District::where('regency_id', $regencyId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-        
-        return response()->json($districts);
-    }
-
-    /**
-     * CASCADE DROPDOWN - Get Villages by District
-     */
-    public function getVillages($districtId)
-    {
-        $villages = Village::where('district_id', $districtId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-        
-        return response()->json($villages);
-    }
-
-    /**
-     * EXPORT to CSV
-     */
-    public function export(Request $request)
-    {
-        $user = Auth::user();
-        $query = SalesVisit::with(['sales', 'province', 'regency', 'district', 'village']);
-
-        // Role-based filtering (sama seperti index)
-        if ($user->role_id == 1) {
-            // Superadmin: all data
-        } elseif (in_array($user->role_id, [7, 11])) {
-            $query->whereHas('sales', function ($q) {
-                $q->where('role_id', 12);
-            });
-        } elseif ($user->role_id == 12) {
-            $query->where('sales_id', $user->user_id);
-        } else {
-            $query->whereNull('id');
-        }
-
-        $visits = $query->orderBy('visit_date', 'desc')->get();
-
-        $filename = 'sales_visits_' . date('Y-m-d_His') . '.csv';
-        
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-        ];
-
-        $callback = function() use ($visits) {
-            $file = fopen('php://output', 'w');
-            
-            // Header CSV
-            fputcsv($file, [
-                'No',
-                'Sales',
-                'Customer Name',
-                'Company',
-                'Province',
-                'Regency',
-                'District',
-                'Village',
-                'Address',
-                'Visit Date',
-                'Purpose',
-                'Follow Up'
-            ]);
-
-            // Data rows
-            foreach ($visits as $index => $visit) {
-                fputcsv($file, [
-                    $index + 1,
-                    $visit->sales->username ?? '-',
-                    $visit->customer_name ?? '-',
-                    $visit->company_name ?? '-',
-                    $visit->province->name ?? '-',
-                    $visit->regency->name ?? '-',
-                    $visit->district->name ?? '-',
-                    $visit->village->name ?? '-',
-                    $visit->address ?? '-',
-                    $visit->visit_date ? $visit->visit_date->format('d-m-Y') : '-',
-                    $visit->visit_purpose ?? '-',
-                    $visit->is_follow_up ? 'Ya' : 'Tidak'
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return Response::stream($callback, 200, $headers);
-    }
-
+}
     /**
      * IMPORT from CSV
      */
