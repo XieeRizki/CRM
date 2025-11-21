@@ -37,7 +37,7 @@
 </head>
 <body class="bg-gray-50">
     
-    <x-publics.nav />
+    
 
     <main>
         @yield('content')

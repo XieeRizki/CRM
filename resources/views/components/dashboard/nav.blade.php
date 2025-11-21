@@ -6,10 +6,21 @@
                 <button id="sidebarToggle" class="text-white hover:text-indigo-300 mr-4 transition-colors">
                     <i class="fas fa-bars text-xl"></i>
                 </button>
-
-                <div class="flex-shrink-0 flex items-center">
-                    <img class="h-8 w-auto" src="{{ asset('img/LOGO INOTAL UNTUK BG GELAP.png') }}" alt="Logo">
-                </div>
+                @if($profile && $profile->logo_path)
+                    <div class="flex-shrink-0 flex items-center">
+                        <img class="h-9 w-auto" 
+                            src="{{ asset('storage/' . $profile->logo_path) }}" 
+                            alt="{{ $profile->company_name ?? 'Company Logo' }}"
+                            onerror="this.style.display='none'">
+                    </div>
+                @else
+                    <!-- Fallback jika tidak ada logo -->
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="h-9 w-9 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-building text-white text-lg"></i>
+                        </div>
+                    </div>
+                @endif
                 
             </div>
 

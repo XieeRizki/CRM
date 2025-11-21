@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View; 
+use Illuminate\Support\Facades\Auth; 
+use App\Models\Profile;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Menu;
@@ -25,6 +27,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
 {
+     // Share profile company ke semua view
+        View::composer('*', function ($view) {
+            // Ambil data profile perusahaan terbaru
+            $profile = Profile::latest()->first();
+            $view->with('profile', $profile);
+        });
+
     // Bikin variabel global untuk semua view
     View::composer('*', function ($view) {
         $view->with('totalUsers', User::count())

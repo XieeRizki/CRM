@@ -13,6 +13,8 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\SalesVisitController;
 use App\Http\Controllers\PicController;
+use App\Http\Controllers\ProfileController;
+
 
 
 // ==========================
@@ -41,6 +43,12 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
+
+    //public
+Route::get('/aboutus', [ProfileController::class, 'aboutUs'])->name('aboutus');
+
+
+
 
 // ==========================
 // CASCADE DROPDOWN ROUTES
@@ -129,6 +137,8 @@ Route::middleware(['auth', 'permission'])->group(function () {
     // ==========================
     Route::get('/calendar', fn() => view('layout.react'))->name('calendar');
 
+    
+
     // ==========================
     // Calendar API Routes
     // ==========================
@@ -147,11 +157,27 @@ Route::middleware(['auth', 'permission'])->group(function () {
     Route::get('/menus/search', [MenuController::class, 'search'])->name('menus.search');
 
     // ==========================
+// Profile Management API
+// ==========================
+Route::prefix('profiles')->name('profiles.')->group(function () {
+    Route::get('/', [ProfileController::class, 'getProfiles'])->name('index');
+    Route::get('/api/profile/latest', [ProfileController::class, 'getLatest']);
+    Route::post('/', [ProfileController::class, 'store'])->name('store');
+    Route::get('/{id}', [ProfileController::class, 'show'])->name('show');
+    Route::put('/{id}', [ProfileController::class, 'update'])->name('update');
+    Route::delete('/{id}', [ProfileController::class, 'destroy'])->name('destroy');
+    Route::post('/reset', [ProfileController::class, 'reset'])->name('reset');
+    Route::get('/stats', [ProfileController::class, 'stats'])->name('stats');
+});
+
+    // ==========================
     // Settings Pages
     // ==========================
     Route::get('/user', [UserController::class, 'index'])->name('user');
     Route::get('/role', [RoleController::class, 'index'])->name('role'); 
     Route::get('/menu', [MenuController::class, 'index'])->name('menu');
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
+
 
     // ==========================
     // CRUD - Users
