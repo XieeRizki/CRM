@@ -349,170 +349,137 @@ window.closeSalesModal = function() {
 }
 
 // =======================
-//  CHART: VISIT TREND (UPDATED)
+//  CHART: VISIT TREND (FINAL - ROLE_ID aware)
 // =======================
 const visitTrendCanvas = document.getElementById("visitTrend");
 let visitTrendChart = null;
 let currentPeriod = 'monthly';
 
 if (visitTrendCanvas) {
-    // Initial load
     loadVisitTrend('monthly');
-    
-    // Setup filter buttons
     setupTrendFilters();
-    
-    // Setup date range picker
     setupDateRangePicker();
+    setupSalesDropdown(); // dropdown only exists for superadmin (role_id == 1)
 }
 
 /**
  * Load visit trend data
+ * period: daily | weekly | monthly | yearly | custom
  */
-function loadVisitTrend(period, startDate = null, endDate = null) {
+function loadVisitTrend(period, startDate = null, endDate = null, selectedUserId = null) {
     if (!visitTrendCanvas) return;
-    
+
     currentPeriod = period;
-    
-    // Show loading
     const loadingDiv = document.getElementById('visitTrendLoading');
     if (loadingDiv) loadingDiv.style.display = 'flex';
-    
-    // Build URL
+
     let url = `/api/visit-trend?period=${period}`;
+
     if (startDate && endDate) {
         url += `&start_date=${startDate}&end_date=${endDate}`;
     }
-    
-    // Fetch data
+
+    // current user info (role_id numeric)
+    const currentUserId = document.getElementById('currentUserId')?.value;
+    const currentUserRoleId = document.getElementById('currentUserRole')?.value; // role_id as string or number
+
+    // If superadmin (role_id == 1) -> do NOT attach user_id unless selectedUserId provided
+    const isSuperadmin = Number(currentUserRoleId) === 1;
+
+    if (selectedUserId) {
+        url += `&user_id=${selectedUserId}`;
+    } else if (!isSuperadmin) {
+        // non-superadmin (sales) -> only their data
+        url += `&user_id=${currentUserId}`;
+    }
+
     fetch(url)
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
+        .then(res => res.json())
         .then(result => {
             if (result.success) {
                 updateVisitTrendChart(result);
                 updateVisitTrendStats(result.stats);
-                
-                // Hide loading
-                if (loadingDiv) loadingDiv.style.display = 'none';
             } else {
-                throw new Error(result.message || 'Failed to load data');
+                console.error('Visit trend API returned success=false', result);
             }
-        })
-        .catch(error => {
-            console.error('Visit trend error:', error);
             if (loadingDiv) loadingDiv.style.display = 'none';
-            
-            // Show error
-            alert('Failed to load visit trend: ' + error.message);
+        })
+        .catch(err => {
+            console.error('Fetch visit-trend error', err);
+            if (loadingDiv) loadingDiv.style.display = 'none';
         });
 }
 
 /**
- * Update chart with new data
+ * Update Chart
  */
 function updateVisitTrendChart(result) {
     const { data } = result;
-    
-    // Destroy old chart
-    if (visitTrendChart) {
-        visitTrendChart.destroy();
-    }
-    
-    // Create new chart - HANYA KUNJUNGAN (TANPA AKUMULASI)
+
+    if (visitTrendChart) visitTrendChart.destroy();
+
+    const currentUserRoleId = Number(document.getElementById('currentUserRole')?.value || 0);
+
+    // Determine color: sales (role_id 12) -> green; else blue
+    const isSales = currentUserRoleId === 12;
+    const color = isSales ? 'rgba(34,197,94,1)' : 'rgba(59,130,246,1)';
+    const fillTop = isSales ? 'rgba(34,197,94,0.28)' : 'rgba(59,130,246,0.28)';
+
     visitTrendChart = new Chart(visitTrendCanvas, {
         type: 'line',
         data: {
-            labels: data.labels,
-            datasets: [
-                {
-                    label: 'Kunjungan',
-                    data: data.visits,
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    backgroundColor: function(context) {
-                        const ctx = context.chart.ctx;
-                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
-                        gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
-                        return gradient;
-                    },
-                    tension: 0.4,  // Smooth curve (0 = straight, 1 = very curved)
-                    fill: true,
-                    borderWidth: 3,
-                    pointRadius: 4,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverBackgroundColor: 'rgba(59, 130, 246, 1)',
-                    pointHoverBorderColor: '#fff',
-                    pointHoverBorderWidth: 3
-                }
-            ]
+            labels: data.labels || [],
+            datasets: [{
+                label: 'Kunjungan',
+                data: data.visits || [],
+                borderColor: color,
+                backgroundColor: function(ctx) {
+                    const c = ctx.chart.ctx;
+                    const g = c.createLinearGradient(0, 0, 0, 400);
+                    g.addColorStop(0, fillTop);
+                    g.addColorStop(1, 'rgba(0,0,0,0.03)');
+                    return g;
+                },
+                tension: 0.35,
+                borderWidth: 3,
+                pointRadius: 4,
+                pointBackgroundColor: color
+            }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
+            interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    display: false  // Hide legend karena cuma 1 line
-                },
+                legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 12,
-                    titleFont: { size: 13, weight: 'bold' },
-                    bodyFont: { size: 12 },
-                    cornerRadius: 8,
-                    displayColors: false,
                     callbacks: {
-                        title: function(context) {
-                            return context[0].label;
-                        },
-                        label: function(context) {
-                            return context.parsed.y + ' kunjungan';
-                        }
+                        title: ctx => ctx[0]?.label || '',
+                        label: ctx => (ctx.parsed.y ?? 0) + ' kunjungan'
                     }
                 }
             },
             scales: {
-                x: {
-                    grid: { 
-                        display: false,
-                        drawBorder: false
-                    },
-                    ticks: { 
-                        font: { size: 10 },
-                        maxRotation: 45,
-                        minRotation: 0,
-                        color: '#6B7280'
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    ticks: { 
-                        stepSize: 1,
-                        font: { size: 11 },
-                        color: '#6B7280',
-                        callback: function(value) {
-                            return Number.isInteger(value) ? value : '';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)',
-                        drawBorder: false
-                    }
-                }
-            },
-            animation: {
-                duration: 1000,
-                easing: 'easeInOutCubic'
+                x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 0 } },
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
             }
+        }
+    });
+}
+
+/**
+ * Setup superadmin dropdown (salesFilter)
+ */
+function setupSalesDropdown() {
+    const dropdown = document.getElementById("salesFilter");
+    if (!dropdown) return;
+
+    dropdown.addEventListener("change", function () {
+        const selected = this.value;
+        if (selected === "") {
+            loadVisitTrend(currentPeriod);
+        } else {
+            loadVisitTrend(currentPeriod, null, null, selected);
         }
     });
 }
@@ -524,41 +491,37 @@ function updateVisitTrendStats(stats) {
     const totalEl = document.getElementById('totalVisits');
     const averageEl = document.getElementById('averageVisits');
     const periodEl = document.getElementById('periodLabel');
-    
-    if (totalEl) totalEl.textContent = stats.total_visits || 0;
+
+    if (totalEl) totalEl.textContent = stats.total_visits ?? 0;
     if (averageEl) {
-        const avgText = currentPeriod === 'daily' ? 'Per Hari' : 
-                       currentPeriod === 'weekly' ? 'Per Minggu' : 
-                       currentPeriod === 'monthly' ? 'Per Bulan' : 'Per Tahun';
-        averageEl.textContent = (stats.average_per_day || stats.average_per_week || stats.average_per_month || stats.average_per_year || 0) + ' / ' + avgText;
+        const avgVal = stats.average_per_day ?? stats.average_per_week ?? stats.average_per_month ?? stats.average_per_year ?? 0;
+        const avgText = currentPeriod === 'daily' ? 'Per Hari' : currentPeriod === 'weekly' ? 'Per Minggu' : currentPeriod === 'monthly' ? 'Per Bulan' : 'Per Tahun';
+        averageEl.textContent = avgVal + ' / ' + avgText;
     }
     if (periodEl) periodEl.textContent = stats.period_label || '';
 }
 
 /**
- * Setup filter buttons
+ * Setup filter buttons (daily/monthly/yearly)
  */
 function setupTrendFilters() {
     const filterButtons = document.querySelectorAll('[data-trend-period]');
-    
     filterButtons.forEach(button => {
         button.addEventListener('click', function() {
             const period = this.getAttribute('data-trend-period');
-            
-            // Update active state
+
+            // active state
             filterButtons.forEach(btn => {
                 btn.classList.remove('bg-blue-500', 'text-white');
                 btn.classList.add('bg-white', 'text-gray-700');
             });
-            
             this.classList.remove('bg-white', 'text-gray-700');
             this.classList.add('bg-blue-500', 'text-white');
-            
-            // Hide date range picker
+
+            // hide date picker
             const dateRangePicker = document.getElementById('dateRangePicker');
             if (dateRangePicker) dateRangePicker.classList.add('hidden');
-            
-            // Load new data
+
             loadVisitTrend(period);
         });
     });
@@ -574,21 +537,18 @@ function setupDateRangePicker() {
     const cancelBtn = document.getElementById('cancelDateRange');
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
-    
-    // Set default dates (last 30 days)
+
     const today = new Date();
     const last30Days = new Date(today);
     last30Days.setDate(today.getDate() - 30);
-    
+
     if (endDateInput) endDateInput.valueAsDate = today;
     if (startDateInput) startDateInput.valueAsDate = last30Days;
-    
-    // Toggle date range picker
+
     if (customRangeBtn && dateRangePicker) {
         customRangeBtn.addEventListener('click', function() {
             dateRangePicker.classList.toggle('hidden');
-            
-            // Remove active state from period buttons
+            // remove active buttons
             const filterButtons = document.querySelectorAll('[data-trend-period]');
             filterButtons.forEach(btn => {
                 btn.classList.remove('bg-blue-500', 'text-white');
@@ -596,30 +556,20 @@ function setupDateRangePicker() {
             });
         });
     }
-    
-    // Apply custom range
+
     if (applyBtn) {
         applyBtn.addEventListener('click', function() {
             const startDate = startDateInput.value;
             const endDate = endDateInput.value;
-            
-            if (!startDate || !endDate) {
-                alert('Please select both start and end dates');
-                return;
-            }
-            
-            if (new Date(startDate) > new Date(endDate)) {
-                alert('Start date must be before end date');
-                return;
-            }
-            
-            // Load custom range data
+            if (!startDate || !endDate) { alert('Please select both start and end dates'); return; }
+            if (new Date(startDate) > new Date(endDate)) { alert('Start date must be before end date'); return; }
+
+            // For custom range we will not include selectedUserId here (allow dropdown to still filter)
             loadVisitTrend('custom', startDate, endDate);
             dateRangePicker.classList.add('hidden');
         });
     }
-    
-    // Cancel
+
     if (cancelBtn) {
         cancelBtn.addEventListener('click', function() {
             dateRangePicker.classList.add('hidden');

@@ -6,14 +6,13 @@
                 <i class="fas fa-info-circle"></i> Detail Transaksi
             </h3>
             <button onclick="closeDetailModal()" class="text-white hover:text-gray-200 transition-colors p-2">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
 
         <!-- Content -->
         <div id="detailContent" style="padding: 1.5rem; max-height: calc(90vh - 150px); overflow-y: auto; background-color: #fafbfc;">
         </div>
-        
     </div>
 </div>
 
@@ -22,6 +21,8 @@
         fetch(`/transaksi/${id}`)
             .then(response => response.json())
             .then(data => {
+                console.log('Data received:', data); // Debug
+                
                 let statusBadge = data.status === 'Deals' 
                     ? '<span style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: linear-gradient(135deg, #dcfce7 0%, #bef264 100%); color: #166534; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);"><i class="fas fa-check-circle"></i> DEALS</span>'
                     : '<span style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem; background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%); color: #991b1b; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);"><i class="fas fa-times-circle"></i> FAILS</span>';
@@ -59,6 +60,26 @@
                     `;
                 }
                 
+                // Format tanggal dengan fungsi helper
+                function formatTanggal(tanggal) {
+                    if (!tanggal) return '-';
+                    const date = new Date(tanggal);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                }
+                
+                // Hitung durasi dalam hari
+                function hitungDurasi(mulai, selesai) {
+                    if (!mulai || !selesai) return 0;
+                    const dateMulai = new Date(mulai);
+                    const dateSelesai = new Date(selesai);
+                    const diffTime = Math.abs(dateSelesai - dateMulai);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays;
+                }
+                
                 let html = `
                     <div style="background: white; border-radius: 0.375rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         <!-- Header Section -->
@@ -75,7 +96,7 @@
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
                                 <div>
                                     <p style="font-size: 0.65rem; color: #0c4a6e; font-weight: 600; text-transform: uppercase; margin: 0;">Tanggal Dibuat</p>
-                                    <p style="color: #0369a1; font-weight: 500; margin: 0.25rem 0 0 0; font-size: 0.875rem;">${new Date(data.created_at).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                    <p style="color: #0369a1; font-weight: 500; margin: 0.25rem 0 0 0; font-size: 0.875rem;">${formatTanggal(data.created_at)}</p>
                                 </div>
                                 <div>
                                     <p style="font-size: 0.65rem; color: #0c4a6e; font-weight: 600; text-transform: uppercase; margin: 0;">Jam Dibuat</p>
@@ -101,7 +122,7 @@
 
                         <!-- PIC Section -->
                         <div style="padding: 1.5rem; border-bottom: 2px solid #e5e7eb;">
-                            ${picHtml}
+                            ${picHtml || '<p style="margin: 0; font-size: 0.75rem; color: #6b7280;"><i class="fas fa-info-circle"></i> Tidak ada PIC untuk transaksi ini</p>'}
                         </div>
 
                         <!-- Nilai & Tanggal Section -->
@@ -114,17 +135,24 @@
                                 </div>
                             </div>
                             ${data.tanggal_mulai_kerja ? `
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                                <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 1rem; border-radius: 0.375rem; border: 1px solid #fcd34d;">
-                                    <p style="margin: 0; font-size: 0.65rem; color: #92400e; font-weight: 600; text-transform: uppercase;">Tanggal Mulai</p>
-                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem; color: #78350f; font-weight: 600;">${new Date(data.tanggal_mulai_kerja).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 1rem; border-radius: 0.375rem; border: 1px solid #fcd34d;">
+                                <p style="margin: 0 0 0.75rem 0; font-size: 0.75rem; color: #92400e; font-weight: 700; text-transform: uppercase;"><i class="fas fa-calendar-alt"></i> PERIODE PENGERJAAN</p>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                                    <div style="background: white; padding: 0.75rem; border-radius: 0.3rem; border-left: 3px solid #f59e0b;">
+                                        <p style="margin: 0; font-size: 0.65rem; color: #92400e; font-weight: 600; text-transform: uppercase;">Mulai</p>
+                                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #78350f; font-weight: 600;">${formatTanggal(data.tanggal_mulai_kerja)}</p>
+                                    </div>
+                                    ${data.tanggal_selesai_kerja ? `
+                                    <div style="background: white; padding: 0.75rem; border-radius: 0.3rem; border-left: 3px solid #f59e0b;">
+                                        <p style="margin: 0; font-size: 0.65rem; color: #92400e; font-weight: 600; text-transform: uppercase;">Selesai</p>
+                                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #78350f; font-weight: 600;">${formatTanggal(data.tanggal_selesai_kerja)}</p>
+                                    </div>
+                                    <div style="background: white; padding: 0.75rem; border-radius: 0.3rem; border-left: 3px solid #f59e0b;">
+                                        <p style="margin: 0; font-size: 0.65rem; color: #92400e; font-weight: 600; text-transform: uppercase;">Durasi</p>
+                                        <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: #78350f; font-weight: 600;">${hitungDurasi(data.tanggal_mulai_kerja, data.tanggal_selesai_kerja)} Hari</p>
+                                    </div>
+                                    ` : ''}
                                 </div>
-                                ${data.tanggal_selesai_kerja ? `
-                                <div style="background: linear-gradient(135deg, #dcfce7 0%, #bef264 100%); padding: 1rem; border-radius: 0.375rem; border: 1px solid #86efac;">
-                                    <p style="margin: 0; font-size: 0.65rem; color: #166534; font-weight: 600; text-transform: uppercase;">Tanggal Selesai</p>
-                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem; color: #15803d; font-weight: 600;">${new Date(data.tanggal_selesai_kerja).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                </div>
-                                ` : ''}
                             </div>
                             ` : ''}
                         </div>
@@ -165,6 +193,12 @@
                                        onmouseout="this.style.backgroundColor='#16a34a'">
                                         <i class="fas fa-download"></i> Download
                                     </a>
+                                </div>
+                                ` : ''}
+                                ${!data.bukti_spk && !data.bukti_dp ? `
+                                <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.375rem; border: 1px dashed #d1d5db; text-align: center; grid-column: 1 / -1;">
+                                    <i class="fas fa-inbox" style="font-size: 1.5rem; color: #9ca3af; margin-bottom: 0.5rem;"></i>
+                                    <p style="margin: 0; font-size: 0.75rem; color: #6b7280; font-weight: 600;">Belum ada dokumen pendukung</p>
                                 </div>
                                 ` : ''}
                             </div>

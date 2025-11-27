@@ -247,4 +247,8 @@ Route::middleware(['auth', 'permission'])->group(function () {
     Route::get('/api/visit-trend', [SalesVisitTrendController::class, 'getVisitTrend'])
         ->name('api.visit.trend');
 
+    Route::get('/trend', [TrendPageController::class, 'index'])
+    ->middleware('auth')
+    ->name('trend.page');
+
 });

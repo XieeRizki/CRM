@@ -10,7 +10,7 @@ class SalesVisitTrendController extends Controller
 {
     /**
      * Get visit trend data based on period
-     * Periods: daily, weekly, monthly, yearly, custom
+     * Support: daily, weekly, monthly, yearly, custom
      */
     public function getVisitTrend(Request $request)
     {
@@ -18,536 +18,424 @@ class SalesVisitTrendController extends Controller
             $period = $request->input('period', 'monthly');
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
-            
-            // If custom date range provided
+            $userId = $request->input('user_id'); // <─ NEW
+
+            // Custom range
             if ($startDate && $endDate) {
-                return $this->getCustomRangeTrend($startDate, $endDate);
+                return $this->getCustomRangeTrend(
+                    Carbon::parse($startDate),
+                    Carbon::parse($endDate),
+                    $userId
+                );
             }
-            
+
             $limit = $this->getLimitByPeriod($period);
-            
+
             switch ($period) {
                 case 'daily':
-                    return $this->getDailyTrend($limit);
+                    return $this->getDailyTrend($limit, $userId);
                 case 'weekly':
-                    return $this->getWeeklyTrend($limit);
+                    return $this->getWeeklyTrend($limit, $userId);
                 case 'monthly':
-                    return $this->getMonthlyTrend($limit);
+                    return $this->getMonthlyTrend($limit, $userId);
                 case 'yearly':
-                    return $this->getYearlyTrend($limit);
+                    return $this->getYearlyTrend($limit, $userId);
                 default:
-                    return $this->getMonthlyTrend($limit);
+                    return $this->getMonthlyTrend($limit, $userId);
             }
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => "Error: " . $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Get custom date range trend (auto-detect best grouping)
+     * Apply user filter (sales_id)
      */
-    private function getCustomRangeTrend($startDate, $endDate)
+    private function applyUserFilter($query, $userId)
     {
-        $start = Carbon::parse($startDate);
-        $end = Carbon::parse($endDate);
-        $daysDiff = $start->diffInDays($end);
+        if (!empty($userId) && $userId !== "all") {
+            $query->where("sales_id", $userId);
+        }
+        return $query;
         
-        // Auto-detect best grouping based on range
+    }
+
+    /**
+     * Custom Range — Auto detect grouping
+     */
+    private function getCustomRangeTrend($startDate, $endDate, $userId = null)
+    {
+        $daysDiff = $startDate->diffInDays($endDate);
+
         if ($daysDiff <= 31) {
-            // <= 1 month: Group by day
-            return $this->getCustomDailyTrend($start, $end);
+            return $this->getCustomDailyTrend($startDate, $endDate, $userId);
         } elseif ($daysDiff <= 90) {
-            // <= 3 months: Group by week
-            return $this->getCustomWeeklyTrend($start, $end);
+            return $this->getCustomWeeklyTrend($startDate, $endDate, $userId);
         } elseif ($daysDiff <= 730) {
-            // <= 2 years: Group by month
-            return $this->getCustomMonthlyTrend($start, $end);
+            return $this->getCustomMonthlyTrend($startDate, $endDate, $userId);
         } else {
-            // > 2 years: Group by year
-            return $this->getCustomYearlyTrend($start, $end);
+            return $this->getCustomYearlyTrend($startDate, $endDate, $userId);
         }
     }
 
     /**
-     * Custom daily trend
+     * Custom daily
      */
-    private function getCustomDailyTrend($startDate, $endDate)
+    private function getCustomDailyTrend($start, $end, $userId)
     {
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('DATE(visit_date) as date'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+        
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('DATE(visit_date)'))
-            ->orderBy('date', 'asc')
+            ->orderBy('date')
             ->get();
 
-        $allDates = [];
-        $currentDate = $startDate->copy();
-        
-        while ($currentDate <= $endDate) {
-            $dateStr = $currentDate->format('Y-m-d');
-            $visit = $visits->firstWhere('date', $dateStr);
-            
-            $allDates[] = [
-                'label' => $currentDate->format('d M'),
-                'date' => $dateStr,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addDay();
-        }
-
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allDates);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'custom-daily',
-            'data' => [
-                'labels' => array_column($allDates, 'label'),
-                'visits' => array_column($allDates, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_day' => count($allDates) > 0 ? round($cumulative / count($allDates), 1) : 0,
-                'period_label' => $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y')
-            ]
-        ]);
+        return $this->buildDailyResponse($visits, $start, $end, 'custom-daily');
     }
 
     /**
-     * Custom weekly trend
+     * Custom weekly
      */
-    private function getCustomWeeklyTrend($startDate, $endDate)
+    private function getCustomWeeklyTrend($start, $end, $userId)
     {
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('EXTRACT(WEEK FROM visit_date) as week'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'), DB::raw('EXTRACT(WEEK FROM visit_date)'))
-            ->orderBy('year', 'asc')
-            ->orderBy('week', 'asc')
+            ->orderBy('year')
+            ->orderBy('week')
             ->get();
 
-        $allWeeks = [];
-        $currentDate = $startDate->copy()->startOfWeek();
-        
-        while ($currentDate <= $endDate) {
-            $year = $currentDate->year;
-            $week = $currentDate->week;
-            
-            $visit = $visits->where('year', $year)->where('week', $week)->first();
-            
-            $allWeeks[] = [
-                'label' => 'W' . $week . ' ' . $currentDate->format('M'),
-                'year' => $year,
-                'week' => $week,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addWeek();
-        }
-
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allWeeks);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'custom-weekly',
-            'data' => [
-                'labels' => array_column($allWeeks, 'label'),
-                'visits' => array_column($allWeeks, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_week' => count($allWeeks) > 0 ? round($cumulative / count($allWeeks), 1) : 0,
-                'period_label' => $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y')
-            ]
-        ]);
+        return $this->buildWeeklyResponse($visits, $start, $end, 'custom-weekly');
     }
 
     /**
-     * Custom monthly trend
+     * Custom monthly
      */
-    private function getCustomMonthlyTrend($startDate, $endDate)
+    private function getCustomMonthlyTrend($start, $end, $userId)
     {
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('EXTRACT(MONTH FROM visit_date) as month'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'), DB::raw('EXTRACT(MONTH FROM visit_date)'))
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
+            ->orderBy('year')
+            ->orderBy('month')
             ->get();
 
-        $allMonths = [];
-        $currentDate = $startDate->copy()->startOfMonth();
-        
-        while ($currentDate <= $endDate) {
-            $year = $currentDate->year;
-            $month = $currentDate->month;
-            
-            $visit = $visits->where('year', $year)->where('month', $month)->first();
-            
-            $allMonths[] = [
-                'label' => $currentDate->format('M Y'),
-                'year' => $year,
-                'month' => $month,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addMonth();
-        }
-
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allMonths);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'custom-monthly',
-            'data' => [
-                'labels' => array_column($allMonths, 'label'),
-                'visits' => array_column($allMonths, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_month' => count($allMonths) > 0 ? round($cumulative / count($allMonths), 1) : 0,
-                'period_label' => $startDate->format('M Y') . ' - ' . $endDate->format('M Y')
-            ]
-        ]);
+        return $this->buildMonthlyResponse($visits, $start, $end, 'custom-monthly');
     }
 
     /**
-     * Custom yearly trend
+     * Custom yearly
      */
-    private function getCustomYearlyTrend($startDate, $endDate)
+    private function getCustomYearlyTrend($start, $end, $userId)
     {
-        $startYear = $startDate->year;
-        $endYear = $endDate->year;
+        $startYear = $start->year;
+        $endYear = $end->year;
 
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('COUNT(*) as visit_count')
-            )
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
             ->whereRaw('EXTRACT(YEAR FROM visit_date) >= ?', [$startYear])
             ->whereRaw('EXTRACT(YEAR FROM visit_date) <= ?', [$endYear])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'))
-            ->orderBy('year', 'asc')
+            ->orderBy('year')
             ->get();
 
-        $allYears = [];
-        
-        for ($year = $startYear; $year <= $endYear; $year++) {
-            $visit = $visits->where('year', $year)->first();
-            
-            $allYears[] = [
-                'label' => (string)$year,
-                'year' => $year,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-        }
-
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allYears);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'custom-yearly',
-            'data' => [
-                'labels' => array_column($allYears, 'label'),
-                'visits' => array_column($allYears, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_year' => count($allYears) > 0 ? round($cumulative / count($allYears), 1) : 0,
-                'period_label' => $startYear . ' - ' . $endYear
-            ]
-        ]);
+        return $this->buildYearlyResponse($visits, $startYear, $endYear, 'custom-yearly');
     }
 
     /**
-     * Get daily visit trend (last 30 days)
+     * DAILY — last 30 days
      */
-    private function getDailyTrend($limit = 30)
+    private function getDailyTrend($limit, $userId)
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subDays($limit);
+        $end = Carbon::now();
+        $start = Carbon::now()->subDays($limit);
 
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('DATE(visit_date) as date'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('DATE(visit_date)'))
-            ->orderBy('date', 'asc')
+            ->orderBy('date')
             ->get();
 
-        // Fill missing dates with 0
-        $allDates = [];
-        $currentDate = $startDate->copy();
-        
-        while ($currentDate <= $endDate) {
-            $dateStr = $currentDate->format('Y-m-d');
-            $visit = $visits->firstWhere('date', $dateStr);
-            
-            $allDates[] = [
-                'label' => $currentDate->format('d M'),
-                'date' => $dateStr,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addDay();
-        }
-
-        // Calculate cumulative
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allDates);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'daily',
-            'data' => [
-                'labels' => array_column($allDates, 'label'),
-                'visits' => array_column($allDates, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_day' => count($allDates) > 0 ? round($cumulative / count($allDates), 1) : 0,
-                'period_label' => $limit . ' Hari Terakhir'
-            ]
-        ]);
+        return $this->buildDailyResponse($visits, $start, $end, 'daily');
     }
 
     /**
-     * Get weekly visit trend (last 12 weeks)
+     * WEEKLY — last 12 weeks
      */
-    private function getWeeklyTrend($limit = 12)
+    private function getWeeklyTrend($limit, $userId)
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subWeeks($limit);
+        $end = Carbon::now();
+        $start = Carbon::now()->subWeeks($limit);
 
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('EXTRACT(WEEK FROM visit_date) as week'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'), DB::raw('EXTRACT(WEEK FROM visit_date)'))
-            ->orderBy('year', 'asc')
-            ->orderBy('week', 'asc')
+            ->orderBy('year')
+            ->orderBy('week')
             ->get();
 
-        // Generate all weeks
-        $allWeeks = [];
-        $currentDate = $startDate->copy()->startOfWeek();
-        
-        while ($currentDate <= $endDate) {
-            $year = $currentDate->year;
-            $week = $currentDate->week;
-            
-            $visit = $visits->where('year', $year)->where('week', $week)->first();
-            
-            $allWeeks[] = [
-                'label' => 'W' . $week,
-                'year' => $year,
-                'week' => $week,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addWeek();
-        }
-
-        // Calculate cumulative
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allWeeks);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'weekly',
-            'data' => [
-                'labels' => array_column($allWeeks, 'label'),
-                'visits' => array_column($allWeeks, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_week' => count($allWeeks) > 0 ? round($cumulative / count($allWeeks), 1) : 0,
-                'period_label' => $limit . ' Minggu Terakhir'
-            ]
-        ]);
+        return $this->buildWeeklyResponse($visits, $start, $end, 'weekly');
     }
 
     /**
-     * Get monthly visit trend (last 12 months)
+     * MONTHLY — last 12 months
      */
-    private function getMonthlyTrend($limit = 12)
+    private function getMonthlyTrend($limit, $userId)
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subMonths($limit);
+        $end = Carbon::now();
+        $start = Carbon::now()->subMonths($limit);
 
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('EXTRACT(MONTH FROM visit_date) as month'),
                 DB::raw('COUNT(*) as visit_count')
-            )
-            ->whereBetween('visit_date', [$startDate, $endDate])
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
+            ->whereBetween('visit_date', [$start, $end])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'), DB::raw('EXTRACT(MONTH FROM visit_date)'))
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
+            ->orderBy('year')
+            ->orderBy('month')
             ->get();
 
-        // Generate all months
-        $allMonths = [];
-        $currentDate = $startDate->copy()->startOfMonth();
-        
-        while ($currentDate <= $endDate) {
-            $year = $currentDate->year;
-            $month = $currentDate->month;
-            
-            $visit = $visits->where('year', $year)->where('month', $month)->first();
-            
-            $allMonths[] = [
-                'label' => $currentDate->format('M Y'),
-                'year' => $year,
-                'month' => $month,
-                'count' => $visit ? $visit->visit_count : 0
-            ];
-            
-            $currentDate->addMonth();
-        }
-
-        // Calculate cumulative
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allMonths);
-
-        return response()->json([
-            'success' => true,
-            'period' => 'monthly',
-            'data' => [
-                'labels' => array_column($allMonths, 'label'),
-                'visits' => array_column($allMonths, 'count'),
-                'cumulative' => $cumulativeData
-            ],
-            'stats' => [
-                'total_visits' => $cumulative,
-                'average_per_month' => count($allMonths) > 0 ? round($cumulative / count($allMonths), 1) : 0,
-                'period_label' => $limit . ' Bulan Terakhir'
-            ]
-        ]);
+        return $this->buildMonthlyResponse($visits, $start, $end, 'monthly');
     }
 
     /**
-     * Get yearly visit trend (last 5 years)
+     * YEARLY — last 5 years
      */
-    private function getYearlyTrend($limit = 5)
+    private function getYearlyTrend($limit, $userId)
     {
         $endYear = Carbon::now()->year;
         $startYear = $endYear - $limit + 1;
 
-        $visits = DB::table('sales_visits')
+        $query = DB::table('sales_visits')
             ->select(
                 DB::raw('EXTRACT(YEAR FROM visit_date) as year'),
                 DB::raw('COUNT(*) as visit_count')
-            )
+            );
+
+        $query = $this->applyUserFilter($query, $userId);
+
+        $visits = $query
             ->whereRaw('EXTRACT(YEAR FROM visit_date) >= ?', [$startYear])
             ->groupBy(DB::raw('EXTRACT(YEAR FROM visit_date)'))
-            ->orderBy('year', 'asc')
+            ->orderBy('year')
             ->get();
 
-        // Generate all years
-        $allYears = [];
-        
-        for ($year = $startYear; $year <= $endYear; $year++) {
-            $visit = $visits->where('year', $year)->first();
-            
-            $allYears[] = [
-                'label' => (string)$year,
-                'year' => $year,
-                'count' => $visit ? $visit->visit_count : 0
+        return $this->buildYearlyResponse($visits, $startYear, $endYear, 'yearly');
+    }
+
+    /**
+     * Reusable response builders
+     */
+    private function buildDailyResponse($visits, $start, $end, $period)
+    {
+        $all = [];
+        $current = $start->copy();
+
+        while ($current <= $end) {
+            $d = $current->format('Y-m-d');
+            $found = $visits->firstWhere('date', $d);
+
+            $all[] = [
+                'label' => $current->format('d M'),
+                'count' => $found->visit_count ?? 0
             ];
+
+            $current->addDay();
         }
 
-        // Calculate cumulative
-        $cumulative = 0;
-        $cumulativeData = array_map(function($item) use (&$cumulative) {
-            $cumulative += $item['count'];
-            return $cumulative;
-        }, $allYears);
+        $cumulative = array_sum(array_column($all, 'count'));
 
         return response()->json([
             'success' => true,
-            'period' => 'yearly',
+            'period' => $period,
             'data' => [
-                'labels' => array_column($allYears, 'label'),
-                'visits' => array_column($allYears, 'count'),
-                'cumulative' => $cumulativeData
+                'labels' => array_column($all, 'label'),
+                'visits' => array_column($all, 'count')
             ],
             'stats' => [
                 'total_visits' => $cumulative,
-                'average_per_year' => count($allYears) > 0 ? round($cumulative / count($allYears), 1) : 0,
-                'period_label' => $limit . ' Tahun Terakhir'
+                'average_per_day' => count($all) ? round($cumulative / count($all), 1) : 0,
+                'period_label' => $start->format('d M Y') . " - " . $end->format('d M Y')
+            ]
+        ]);
+    }
+
+    private function buildWeeklyResponse($visits, $start, $end, $period)
+    {
+        $all = [];
+        $current = $start->copy()->startOfWeek();
+
+        while ($current <= $end) {
+            $yr = $current->year;
+            $wk = $current->week;
+
+            $found = $visits
+                ->where('year', $yr)
+                ->where('week', $wk)
+                ->first();
+
+            $all[] = [
+                'label' => "W$wk",
+                'count' => $found->visit_count ?? 0
+            ];
+
+            $current->addWeek();
+        }
+
+        $total = array_sum(array_column($all, 'count'));
+
+        return response()->json([
+            'success' => true,
+            'period' => $period,
+            'data' => [
+                'labels' => array_column($all, 'label'),
+                'visits' => array_column($all, 'count')
+            ],
+            'stats' => [
+                'total_visits' => $total,
+                'average_per_week' => count($all) ? round($total / count($all), 1) : 0,
+                'period_label' => $start->format('d M Y') . " - " . $end->format('d M Y')
+            ]
+        ]);
+    }
+
+    private function buildMonthlyResponse($visits, $start, $end, $period)
+    {
+        $all = [];
+        $current = $start->copy()->startOfMonth();
+
+        while ($current <= $end) {
+            $yr = $current->year;
+            $mn = $current->month;
+
+            $found = $visits
+                ->where('year', $yr)
+                ->where('month', $mn)
+                ->first();
+
+            $all[] = [
+                'label' => $current->format('M Y'),
+                'count' => $found->visit_count ?? 0
+            ];
+
+            $current->addMonth();
+        }
+
+        $total = array_sum(array_column($all, 'count'));
+
+        return response()->json([
+            'success' => true,
+            'period' => $period,
+            'data' => [
+                'labels' => array_column($all, 'label'),
+                'visits' => array_column($all, 'count')
+            ],
+            'stats' => [
+                'total_visits' => $total,
+                'average_per_month' => count($all) ? round($total / count($all), 1) : 0,
+                'period_label' => $start->format('M Y') . " - " . $end->format('M Y')
+            ]
+        ]);
+    }
+
+    private function buildYearlyResponse($visits, $startYear, $endYear, $period)
+    {
+        $all = [];
+        for ($yr = $startYear; $yr <= $endYear; $yr++) {
+            $found = $visits->firstWhere('year', $yr);
+
+            $all[] = [
+                'label' => "$yr",
+                'count' => $found->visit_count ?? 0
+            ];
+        }
+
+        $total = array_sum(array_column($all, 'count'));
+
+        return response()->json([
+            'success' => true,
+            'period' => $period,
+            'data' => [
+                'labels' => array_column($all, 'label'),
+                'visits' => array_column($all, 'count')
+            ],
+            'stats' => [
+                'total_visits' => $total,
+                'average_per_year' => count($all) ? round($total / count($all), 1) : 0,
+                'period_label' => "$startYear - $endYear"
             ]
         ]);
     }
 
     /**
-     * Get limit based on period
+     * Period limits
      */
     private function getLimitByPeriod($period)
     {
-        switch ($period) {
-            case 'daily':
-                return 30;  // 30 days
-            case 'weekly':
-                return 12;  // 12 weeks
-            case 'monthly':
-                return 12;  // 12 months
-            case 'yearly':
-                return 5;   // 5 years
-            default:
-                return 12;
-        }
+        return match ($period) {
+            'daily' => 30,
+            'weekly' => 12,
+            'monthly' => 12,
+            'yearly' => 5,
+            default => 12
+        };
     }
 }

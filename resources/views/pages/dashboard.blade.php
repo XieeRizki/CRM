@@ -17,7 +17,11 @@
     <!-- Status Proposal & Trend -->
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8 px-4 sm:px-6 lg:px-8">
         <x-dashboard.chart.statusproposal />
-        <x-dashboard.kpi.trendbulanan />
+        <x-dashboard.kpi.trendbulanan 
+            :current-user="auth()->user()" 
+            :sales-list="\App\Models\User::where('role_id', 12)->get()" 
+        />
+
     </div>
 
     <!-- Communication & Follow-up Reminders -->
