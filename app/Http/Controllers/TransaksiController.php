@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\CompanyPic;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class TransaksiController extends Controller
 {
@@ -48,8 +49,8 @@ class TransaksiController extends Controller
                 'status' => 'required|in:Deals,Fails',
                 'bukti_spk' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
                 'bukti_dp' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
-                'tanggal_mulai_kerja' => 'nullable|date_format:Y-m-d',
-                'tanggal_selesai_kerja' => 'nullable|date_format:Y-m-d|after_or_equal:tanggal_mulai_kerja',
+                'tanggal_mulai_kerja' => 'nullable|date_format:d M Y',
+                'tanggal_selesai_kerja' => 'nullable|date_format:d M Y|after_or_equal:tanggal_mulai_kerja',
                 'keterangan' => 'nullable|string|max:1000',
             ]);
 
@@ -80,13 +81,20 @@ class TransaksiController extends Controller
 
     public function show($id)
     {
-        try {
-            $item = Transaksi::with(['sales', 'company', 'salesVisit', 'pic'])->findOrFail($id);
-            return response()->json($item);
-        } catch (\Exception $e) {
-            \Log::error('Error fetching transaksi: ' . $e->getMessage());
-            return response()->json(['error' => 'Transaksi tidak ditemukan'], 404);
+        $item = Transaksi::with(['sales', 'company', 'salesVisit', 'pic'])->findOrFail($id);
+
+        // Format tanggal ke format d M Y (BERSIH, tanpa timestamp)
+        $response = $item->toArray();
+
+        if ($item->tanggal_mulai_kerja) {
+            $response['tanggal_mulai_kerja'] = Carbon::parse($item->tanggal_mulai_kerja)->format('d M Y');
         }
+
+        if ($item->tanggal_selesai_kerja) {
+            $response['tanggal_selesai_kerja'] = Carbon::parse($item->tanggal_selesai_kerja)->format('d M Y');
+        }
+
+        return response()->json($response);
     }
 
     public function edit($id)
@@ -117,8 +125,8 @@ class TransaksiController extends Controller
                 'status' => 'required|in:Deals,Fails',
                 'bukti_spk' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
                 'bukti_dp' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
-                'tanggal_mulai_kerja' => 'nullable|date_format:Y-m-d',
-                'tanggal_selesai_kerja' => 'nullable|date_format:Y-m-d|after_or_equal:tanggal_mulai_kerja',
+                'tanggal_mulai_kerja' => 'nullable|date_format:d M Y',
+                'tanggal_selesai_kerja' => 'nullable|date_format:d M Y|after_or_equal:tanggal_mulai_kerja',
                 'keterangan' => 'nullable|string|max:1000',
             ]);
 
