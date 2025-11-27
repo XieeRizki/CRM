@@ -2,15 +2,6 @@
 
 @section('content')
 <div class="container-fluid mt-12" style="padding: 1rem;">
-    
-    <!-- Success Message -->
-    @if($message = Session::get('success'))
-    <div style="background-color: #dcfce7; border: 1px solid #86efac; border-radius: 0.375rem; padding: 0.875rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; animation: slideDown 0.3s ease-out;">
-        <i class="fas fa-check-circle" style="color: #22c55e; font-size: 1rem;"></i>
-        <span style="color: #166534; font-weight: 500; font-size: 0.875rem;">{{ $message }}</span>
-        <button onclick="this.parentElement.style.display='none'" style="margin-left: auto; background: none; border: none; color: #166534; cursor: pointer; font-size: 1.25rem;">×</button>
-    </div>
-    @endif
 
     <!-- KPI Cards -->
     @include('components.transaksi.kpi', ['transaksi' => $transaksi])
