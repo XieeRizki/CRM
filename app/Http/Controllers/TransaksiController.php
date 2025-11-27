@@ -48,8 +48,8 @@ class TransaksiController extends Controller
                 'status' => 'required|in:Deals,Fails',
                 'bukti_spk' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
                 'bukti_dp' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
-                'tanggal_mulai_kerja' => 'nullable|date_format:d/m/Y',
-                'tanggal_selesai_kerja' => 'nullable|date_format:d/m/Y|after_or_equal:tanggal_mulai_kerja',
+                'tanggal_mulai_kerja' => 'nullable|date_format:Y-m-d',
+                'tanggal_selesai_kerja' => 'nullable|date_format:Y-m-d|after_or_equal:tanggal_mulai_kerja',
                 'keterangan' => 'nullable|string|max:1000',
             ]);
 
@@ -82,15 +82,6 @@ class TransaksiController extends Controller
     {
         try {
             $item = Transaksi::with(['sales', 'company', 'salesVisit', 'pic'])->findOrFail($id);
-            
-            // Format tanggal ke d/m/Y aja (hilangkan timezone info)
-            if ($item->tanggal_mulai_kerja) {
-                $item->tanggal_mulai_kerja = $item->tanggal_mulai_kerja->format('d/m/Y');
-            }
-            if ($item->tanggal_selesai_kerja) {
-                $item->tanggal_selesai_kerja = $item->tanggal_selesai_kerja->format('d/m/Y');
-            }
-            
             return response()->json($item);
         } catch (\Exception $e) {
             \Log::error('Error fetching transaksi: ' . $e->getMessage());
@@ -102,15 +93,6 @@ class TransaksiController extends Controller
     {
         try {
             $item = Transaksi::with(['sales', 'company', 'salesVisit', 'pic'])->findOrFail($id);
-            
-            // Format tanggal ke d/m/Y aja
-            if ($item->tanggal_mulai_kerja) {
-                $item->tanggal_mulai_kerja = $item->tanggal_mulai_kerja->format('d/m/Y');
-            }
-            if ($item->tanggal_selesai_kerja) {
-                $item->tanggal_selesai_kerja = $item->tanggal_selesai_kerja->format('d/m/Y');
-            }
-            
             return response()->json($item);
         } catch (\Exception $e) {
             \Log::error('Error fetching transaksi for edit: ' . $e->getMessage());
@@ -135,8 +117,8 @@ class TransaksiController extends Controller
                 'status' => 'required|in:Deals,Fails',
                 'bukti_spk' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
                 'bukti_dp' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
-                'tanggal_mulai_kerja' => 'nullable|date_format:d/m/Y',
-                'tanggal_selesai_kerja' => 'nullable|date_format:d/m/Y|after_or_equal:tanggal_mulai_kerja',
+                'tanggal_mulai_kerja' => 'nullable|date_format:Y-m-d',
+                'tanggal_selesai_kerja' => 'nullable|date_format:Y-m-d|after_or_equal:tanggal_mulai_kerja',
                 'keterangan' => 'nullable|string|max:1000',
             ]);
 
