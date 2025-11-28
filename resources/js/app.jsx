@@ -51,7 +51,7 @@ if (rootElement) {
 }
 
 // =======================
-//  SALES PERFORMANCE CHART (NEW)
+//  SALES PERFORMANCE CHART (FIXED)
 // =======================
 const salesPerformanceCanvas = document.getElementById("salesPerformance");
 
@@ -60,10 +60,30 @@ if (salesPerformanceCanvas) {
     const loadingDiv = salesPerformanceCanvas.parentElement.querySelector('.loading-indicator');
     if (loadingDiv) loadingDiv.style.display = 'flex';
 
-    // Fetch data from API
-    fetch('/api/sales-performance')
+    // Get CSRF token
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    // Fetch data from API with credentials
+    fetch('/api/sales-performance', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',  // Important for Laravel
+            'Accept': 'application/json'  // Force JSON response
+        },
+        credentials: 'same-origin'  // Include cookies for session auth
+    })
         .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server returned non-JSON response. Check if you are logged in.');
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             return response.json();
         })
         .then(result => {
@@ -166,6 +186,9 @@ if (salesPerformanceCanvas) {
                         </svg>
                         <p class="font-semibold">Failed to load sales data</p>
                         <p class="text-sm mt-1">${error.message}</p>
+                        <button onclick="window.location.reload()" class="mt-3 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            Reload Page
+                        </button>
                     </div>
                 </div>
             `;
@@ -173,12 +196,30 @@ if (salesPerformanceCanvas) {
 }
 
 /**
- * Show sales detail modal
+ * Show sales detail modal (FIXED with credentials)
  */
 function showSalesDetailModal(userId, salesName) {
-    fetch(`/api/sales-performance/${userId}`)
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    fetch(`/api/sales-performance/${userId}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
         .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server returned non-JSON response. You may not be authenticated.');
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             return response.json();
         })
         .then(result => {
@@ -291,9 +332,7 @@ function showSalesDetailModal(userId, salesName) {
                                         </p>
                                     </div>
                                     
-                                    <p class="text-xs text-center text-gray-500 italic mt-4">
-                                        * Real data from transaksi table
-                                    </p>
+                                    
                                 </div>
                             </div>
                         </div>
@@ -336,7 +375,6 @@ function showSalesDetailModal(userId, salesName) {
             document.body.insertAdjacentHTML('beforeend', errorModal);
         });
 }
-
 /**
  * Close sales detail modal
  */

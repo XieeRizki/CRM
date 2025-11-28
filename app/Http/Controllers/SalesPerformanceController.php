@@ -4,16 +4,41 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class SalesPerformanceController extends Controller
 {
-    public function getSalesPerformance()
+    public function getSalesPerformance(Request $request)
     {
         try {
-            // Query untuk ambil data sales dan company yang dikunjungi
-            $salesPerformance = DB::table('sales_visits')
+            $currentUser = Auth::user();
+            
+            // Check if user is authenticated
+            if (!$currentUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated. Please login first.'
+                ], 401);
+            }
+            
+            $requestedUserId = $request->input('user_id');
+            
+            // Determine which user(s) to query
+            $query = DB::table('sales_visits')
                 ->join('users', DB::raw('CAST(sales_visits.sales_id AS INTEGER)'), '=', 'users.user_id')
-                ->where('users.role_id', 12)  // Filter hanya Sales role
+                ->where('users.role_id', 12);  // Filter only Sales role
+            
+            // If sales (role_id = 12), only show their own data
+            if ($currentUser->role_id == 12) {
+                $query->where('users.user_id', $currentUser->user_id);
+            } 
+            // If superadmin (role_id = 1) and specific user requested
+            elseif ($currentUser->role_id == 1 && $requestedUserId) {
+                $query->where('users.user_id', $requestedUserId);
+            }
+            // Else: superadmin viewing all sales (no additional filter)
+
+            $salesPerformance = $query
                 ->select(
                     'users.user_id',
                     'users.username as sales_name',
@@ -65,19 +90,19 @@ class SalesPerformanceController extends Controller
                 ]);
             }
 
-            // Query REAL data Deal & Fails dari table transaksi
+            // Query REAL data Deal & Fails from transaksi table
             $dealsData = [];
             $failsData = [];
             
             foreach ($salesPerformance as $sales) {
-                // Hitung Deal (status = 'Deals')
+                // Count Deals (status = 'Deals')
                 $dealCount = DB::table('transaksi')
                     ->whereRaw('CAST(transaksi.sales_id AS INTEGER) = ?', [$sales->user_id])
                     ->where('status', 'Deals')
                     ->distinct('company_id')
                     ->count('company_id');
                 
-                // Hitung Fails (status = 'Fails')
+                // Count Fails (status = 'Fails')
                 $failCount = DB::table('transaksi')
                     ->whereRaw('CAST(transaksi.sales_id AS INTEGER) = ?', [$sales->user_id])
                     ->where('status', 'Fails')
@@ -95,28 +120,28 @@ class SalesPerformanceController extends Controller
             $totalActiveSales = $salesPerformance->count();
             $topPerformer = $salesPerformance->first();
 
-            // Format data untuk Chart.js - 3 Bars per Sales
+            // Format data for Chart.js - 3 Bars per Sales
             $chartData = [
                 'labels' => $salesPerformance->pluck('sales_name')->toArray(),
                 'datasets' => [
                     [
                         'label' => 'Company Visited',
                         'data' => $salesPerformance->pluck('company_visited')->toArray(),
-                        'backgroundColor' => 'rgba(59, 130, 246, 0.8)',  // Blue
+                        'backgroundColor' => 'rgba(59, 130, 246, 0.8)',
                         'borderColor' => 'rgb(59, 130, 246)',
                         'borderWidth' => 1
                     ],
                     [
                         'label' => 'Deal',
-                        'data' => $dealsData,  // REAL data dari transaksi
-                        'backgroundColor' => 'rgba(16, 185, 129, 0.8)',  // Green
+                        'data' => $dealsData,
+                        'backgroundColor' => 'rgba(16, 185, 129, 0.8)',
                         'borderColor' => 'rgb(16, 185, 129)',
                         'borderWidth' => 1
                     ],
                     [
                         'label' => 'Fails',
-                        'data' => $failsData,  // REAL data dari transaksi
-                        'backgroundColor' => 'rgba(239, 68, 68, 0.8)',  // Red
+                        'data' => $failsData,
+                        'backgroundColor' => 'rgba(239, 68, 68, 0.8)',
                         'borderColor' => 'rgb(239, 68, 68)',
                         'borderWidth' => 1
                     ]
@@ -139,6 +164,7 @@ class SalesPerformanceController extends Controller
                 'data' => $chartData,
                 'stats' => $stats,
                 'details' => $salesPerformance,
+                'current_user_role' => $currentUser->role_id,
                 'note' => 'Deal and Fails data from transaksi table'
             ]);
 
@@ -146,7 +172,8 @@ class SalesPerformanceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
             ], 500);
         }
     }
@@ -154,7 +181,25 @@ class SalesPerformanceController extends Controller
     public function getSalesDetail($userId)
     {
         try {
-            // Get sales info dengan role check
+            $currentUser = Auth::user();
+            
+            // Check authentication
+            if (!$currentUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated. Please login first.'
+                ], 401);
+            }
+            
+            // Security check: Sales can only see their own data
+            if ($currentUser->role_id == 12 && $currentUser->user_id != $userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: You can only view your own data'
+                ], 403);
+            }
+
+            // Get sales info with role check
             $sales = DB::table('users')
                 ->join('roles', 'users.role_id', '=', 'roles.role_id')
                 ->where('users.user_id', $userId)
@@ -169,7 +214,7 @@ class SalesPerformanceController extends Controller
                 ], 404);
             }
 
-            // Get Company yang sudah dikunjungi dengan REAL status dari transaksi
+            // Get companies visited with REAL status from transaksi
             $companyVisited = DB::table('sales_visits')
                 ->join('company', 'sales_visits.company_id', '=', 'company.company_id')
                 ->leftJoin('transaksi', function($join) use ($userId) {
@@ -185,24 +230,22 @@ class SalesPerformanceController extends Controller
                     DB::raw('COUNT(DISTINCT sales_visits.id) as visit_count'),
                     DB::raw('MAX(sales_visits.visit_date) as last_visit'),
                     DB::raw('MIN(sales_visits.visit_date) as first_visit'),
-                    DB::raw('MAX(transaksi.status) as deal_status')  // Get status dari transaksi
+                    DB::raw('MAX(transaksi.status) as deal_status')
                 )
                 ->groupBy('company.company_id', 'company.company_name', 'company.tier', 'company.status')
                 ->orderByRaw('COUNT(DISTINCT sales_visits.id) DESC')
                 ->get();
 
-            // Map dengan REAL status dari transaksi
+            // Map with REAL status from transaksi
             $companyWithStatus = $companyVisited->map(function($company) {
-                // Gunakan status REAL dari transaksi
                 $status = $company->deal_status ?? 'Pending';
                 
-                // Set color berdasarkan status
                 if ($status === 'Deals') {
                     $statusColor = 'green';
                 } elseif ($status === 'Fails') {
                     $statusColor = 'red';
                 } else {
-                    $statusColor = 'gray';  // Pending/Belum ada transaksi
+                    $statusColor = 'gray';
                 }
                 
                 return [
@@ -212,7 +255,7 @@ class SalesPerformanceController extends Controller
                     'visit_count' => $company->visit_count,
                     'last_visit' => $company->last_visit,
                     'first_visit' => $company->first_visit,
-                    'status' => $status,  // REAL status
+                    'status' => $status,
                     'status_color' => $statusColor
                 ];
             });
@@ -236,24 +279,32 @@ class SalesPerformanceController extends Controller
                     'total_visits' => $companyVisited->sum('visit_count'),
                     'details' => $companyWithStatus
                 ],
-                'note' => 'Real data from transaksi table'
+
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
             ], 500);
         }
     }
 
-    /**
-     * Get list of all sales users
-     */
     public function getSalesList()
     {
         try {
+            $currentUser = Auth::user();
+            
+            // Only superadmin can see all sales list
+            if ($currentUser->role_id != 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: Only superadmin can access this endpoint'
+                ], 403);
+            }
+
             $salesList = DB::table('users')
                 ->join('roles', 'users.role_id', '=', 'roles.role_id')
                 ->leftJoin('sales_visits', DB::raw('users.user_id'), '=', DB::raw('CAST(sales_visits.sales_id AS INTEGER)'))

@@ -233,12 +233,12 @@ Route::middleware(['auth', 'permission'])->group(function () {
         Route::get('/export', [CompanyChartController::class, 'exportGeoDataPie']);
     });
 
-    // ==========================
-    // SALES PERFORMANCE CHART ROUTES
-    // ==========================
-    Route::get('/api/sales-performance', [SalesPerformanceController::class, 'getSalesPerformance']);
-    Route::get('/api/sales-performance/{userId}', [SalesPerformanceController::class, 'getSalesDetail']);
-    Route::get('/api/sales-list', [SalesPerformanceController::class, 'getSalesList']);
+    Route::middleware(['auth'])->group(function () {
+        // Sales Performance Routes
+        Route::get('/api/sales-performance', [SalesPerformanceController::class, 'getSalesPerformance'])->name('api.sales.performance');
+        Route::get('/api/sales-performance/{userId}', [SalesPerformanceController::class, 'getSalesDetail'])->name('api.sales.detail');
+        Route::get('/api/sales-list', [SalesPerformanceController::class, 'getSalesList'])->name('api.sales.list');
+    });
 
     // ===================================
     // VISIT TREND ROUTES

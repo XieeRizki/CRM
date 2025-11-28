@@ -164,7 +164,7 @@
             <!-- PENGAJUAN PROPOSAL STAGE -->
             <div style="border-right:1px solid #e5e7eb;">
                 <div style="padding:0.875rem;font-weight:600;font-size:0.85rem;background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;display:flex;justify-content:space-between;align-items:center;">
-                    <span><i class="fas fa-file-alt"></i> Proposal</span>
+                    <span><i class="fas fa-file-alt"></i> Pengajuan Proposal</span>
                     <span style="background:rgba(255,255,255,0.2);padding:0.2rem 0.45rem;border-radius:0.25rem;font-size:0.65rem;">3</span>
                 </div>
                 <div style="max-height:500px;overflow-y:auto;">

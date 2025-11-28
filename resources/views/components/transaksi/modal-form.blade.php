@@ -15,7 +15,7 @@
 
         <!-- Form Container dengan 2 Kolom -->
         <div style="display: flex; flex: 1; overflow: hidden;">
-            <!-- KOLOM KIRI: Sales, Company, PIC (40%) -->
+            <!-- KOLOM KIRI: Sales, Company, PIC, Keterangan (40%) -->
             <div style="flex: 0 0 40%; border-right: 1px solid #e5e7eb; overflow-y: auto; padding: 1.5rem; background-color: #ffffff;">
                 <form id="transaksiForm">
                     @csrf
@@ -235,11 +235,21 @@
                         <i class="fas fa-inbox" style="color: #f59e0b; font-size: 1.25rem;"></i>
                         <p style="margin: 0.5rem 0 0 0; font-size: 0.7rem; color: #92400e; font-weight: 600;">Pilih Company untuk load PIC</p>
                     </div>
+
+                    <!-- 9. Keterangan (Dipindahkan dari kanan ke kiri) -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; font-size: 0.7rem; font-weight: 600; color: #111827; margin-bottom: 0.375rem;">
+                            📝 Keterangan
+                        </label>
+                        <textarea name="keterangan" id="keterangan" rows="3"
+                            style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.3rem; font-size: 0.75rem; font-family: inherit; resize: vertical;"
+                            placeholder="Catatan tambahan..."></textarea>
+                    </div>
                 </form>
             </div>
 
-            <!-- KOLOM KANAN: Nilai, File, Tanggal, Keterangan (60%) -->
-            <div id="rightColumn" style="flex: 0 0 60%; overflow-y: auto; padding: 1.5rem; background-color: #f3f4f6; opacity: 0.6; pointer-events: none; transition: all 0.3s;">
+            <!-- KOLOM KANAN: Nilai, File, Tanggal (60%) -->
+            <div id="rightColumn" style="flex: 0 0 60%; overflow-y: auto; padding: 1.5rem; background-color: #f3f4f6; opacity: 0.6; transition: all 0.3s;">
                 <!-- Warning Badge (hanya muncul saat disabled) -->
                 <div id="disabledWarning" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border: 2px solid #fca5a5; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; text-align: center; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);">
                     <i class="fas fa-lock" style="font-size: 2rem; color: #dc2626; margin-bottom: 0.5rem;"></i>
@@ -315,116 +325,17 @@
                             onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
                             onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'">
                     </div>
-
-                    <!-- Keterangan -->
-                    <div style="margin-bottom: 1.5rem;">
-                        <label style="display: block; font-size: 0.7rem; font-weight: 600; color: #111827; margin-bottom: 0.375rem;">
-                            📝 Keterangan
-                        </label>
-                        <textarea name="keterangan" id="keterangan" rows="3"
-                            style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.3rem; font-size: 0.75rem; font-family: inherit; resize: vertical; background-color: #e5e7eb; cursor: not-allowed;"
-                            placeholder="Catatan tambahan..." disabled
-                            onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
-                            onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
-                    </div>
                 </form>
             </div>
         </div>
 
-        <!-- Footer dengan tombol KONFIRMASI -->
-        <div id="footerButtons" style="padding: 1rem; border-top: 2px solid #e5e7eb; background-color: #f9fafb; display: flex; gap: 0.75rem; flex-shrink: 0; box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.05);">
-            <button type="button" onclick="closeTransaksiModal()"
-                style="flex: 1; padding: 0.625rem 1rem; background-color: #6b7280; color: white; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
-                onmouseover="this.style.backgroundColor='#4b5563'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(0, 0, 0, 0.15)'"
-                onmouseout="this.style.backgroundColor='#6b7280'; this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0, 0, 0, 0.1)'">
-                <i class="fas fa-times"></i> Batal
-            </button>
+        <!-- Footer dengan tombol Batal & Simpan -->
+        <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
             <button type="button" id="confirmButton" onclick="handleConfirmClick()"
-                style="flex: 2; padding: 0.625rem 1rem; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);"
-                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 12px rgba(59, 130, 246, 0.4)'"
-                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(59, 130, 246, 0.3)'">
-                <i class="fas fa-save"></i> Konfirmasi & Simpan
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/30">
+                <i class="fas fa-save"></i>
+                Simpan
             </button>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL KONFIRMASI FAILS -->
-<div id="confirmFailsModal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div style="padding: 1.5rem; text-align: center;">
-            <div style="width: 4rem; height: 4rem; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #dc2626;"></i>
-            </div>
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0 0 0.5rem 0;">Konfirmasi Transaksi Gagal</h3>
-            <p style="font-size: 0.875rem; color: #6b7280; margin: 0 0 1.5rem 0;">Apakah Anda yakin transaksi ini <strong style="color: #dc2626;">GAGAL (Fails)</strong>?</p>
-            
-            <div style="background-color: #fef3c7; border: 1px solid #fcd34d; border-radius: 0.375rem; padding: 0.875rem; margin-bottom: 1.5rem;">
-                <p style="margin: 0; font-size: 0.75rem; color: #92400e; font-weight: 600;">
-                    <i class="fas fa-info-circle"></i> Data yang akan disimpan:
-                </p>
-                <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0; font-size: 0.7rem; color: #78350f;">
-                    <li>Informasi Sales & Perusahaan</li>
-                    <li>Data PIC (jika ada)</li>
-                    <li>Status: <strong>Fails</strong></li>
-                </ul>
-            </div>
-            
-            <div style="display: flex; gap: 0.75rem;">
-                <button type="button" onclick="closeConfirmFailsModal()"
-                    style="flex: 1; padding: 0.625rem 1rem; background-color: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;"
-                    onmouseover="this.style.backgroundColor='#d1d5db'"
-                    onmouseout="this.style.backgroundColor='#e5e7eb'">
-                    <i class="fas fa-arrow-left"></i> Kembali
-                </button>
-                <button type="button" onclick="confirmFailsAndSubmit()"
-                    style="flex: 1; padding: 0.625rem 1rem; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);"
-                    onmouseover="this.style.boxShadow='0 6px 12px rgba(239, 68, 68, 0.4)'"
-                    onmouseout="this.style.boxShadow='0 2px 4px rgba(239, 68, 68, 0.3)'">
-                    <i class="fas fa-check"></i> Ya, Simpan Fails
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL KONFIRMASI DEALS -->
-<div id="confirmDealsModal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div style="padding: 1.5rem; text-align: center;">
-            <div style="width: 4rem; height: 4rem; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                <i class="fas fa-check-circle" style="font-size: 2rem; color: #16a34a;"></i>
-            </div>
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: #111827; margin: 0 0 0.5rem 0;">Konfirmasi Transaksi Berhasil</h3>
-            <p style="font-size: 0.875rem; color: #6b7280; margin: 0 0 1.5rem 0;">Apakah semua data sudah benar dan siap disimpan?</p>
-            
-            <div style="background-color: #dcfce7; border: 1px solid #86efac; border-radius: 0.375rem; padding: 0.875rem; margin-bottom: 1.5rem; text-align: left;">
-                <p style="margin: 0 0 0.5rem 0; font-size: 0.75rem; color: #166534; font-weight: 600;">
-                    <i class="fas fa-clipboard-check"></i> Data yang akan disimpan:
-                </p>
-                <div style="font-size: 0.7rem; color: #15803d; display: grid; gap: 0.25rem;">
-                    <div>✓ Informasi Sales & Perusahaan</div>
-                    <div>✓ Data PIC</div>
-                    <div>✓ Nilai Proyek & Tanggal</div>
-                    <div>✓ Dokumen Pendukung</div>
-                    <div>✓ Status: <strong>Deals</strong></div>
-                </div>
-            </div>
-            
-            <div style="display: flex; gap: 0.75rem;">
-                <button type="button" onclick="closeConfirmDealsModal()"
-                    style="flex: 1; padding: 0.625rem 1rem; background-color: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;"
-                    onmouseover="this.style.backgroundColor='#d1d5db'"
-                    onmouseout="this.style.backgroundColor='#e5e7eb'">
-                    <i class="fas fa-arrow-left"></i> Kembali
-                </button>
-                <button type="button" onclick="confirmDealsAndSubmit()"
-                    style="flex: 1; padding: 0.625rem 1rem; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; border: none; border-radius: 0.375rem; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);"
-                    onmouseover="this.style.boxShadow='0 6px 12px rgba(34, 197, 94, 0.4)'"
-                    onmouseout="this.style.boxShadow='0 2px 4px rgba(34, 197, 94, 0.3)'">
-                    <i class="fas fa-check"></i> Ya, Simpan Deals
-                </button>
-            </div>
         </div>
     </div>
 </div>
@@ -444,11 +355,11 @@
         const statusInput = document.getElementById('status');
         
         if (statusFails.checked) {
-            // Mode FAILS - Disable kolom kanan
+            // Mode FAILS - Disable input di kolom kanan tapi tetap bisa scroll
             statusInput.value = 'Fails';
             rightColumn.style.backgroundColor = '#f3f4f6';
             rightColumn.style.opacity = '0.6';
-            rightColumn.style.pointerEvents = 'none';
+            // Hapus pointer-events: none agar scroll tetap berfungsi
             disabledWarning.style.display = 'block';
             
             // Style radio labels
@@ -488,7 +399,7 @@
             statusInput.value = 'Deals';
             rightColumn.style.backgroundColor = '#ffffff';
             rightColumn.style.opacity = '1';
-            rightColumn.style.pointerEvents = 'auto';
+            // Tidak perlu menambah pointer-events karena defaultnya auto
             disabledWarning.style.display = 'none';
             
             // Style radio labels
@@ -541,44 +452,21 @@
         const statusFails = document.getElementById('statusFails');
         
         if (statusFails.checked) {
-            // Tampilkan modal konfirmasi FAILS
-            document.getElementById('confirmFailsModal').classList.add('active');
+            // Tampilkan konfirmasi untuk Fails
+            if (confirm('Apakah Anda yakin transaksi ini GAGAL (Fails)?')) {
+                submitForm();
+            }
         } else {
             // Validasi tambahan untuk Deals
             if (!document.getElementById('nilai_proyek').value) {
                 alert('❌ Silakan masukkan Nilai Proyek!');
                 return;
             }
-            // Tampilkan modal konfirmasi DEALS
-            document.getElementById('confirmDealsModal').classList.add('active');
+            // Tampilkan konfirmasi untuk Deals
+            if (confirm('Apakah semua data sudah benar dan siap disimpan?')) {
+                submitForm();
+            }
         }
-    }
-
-    // ==========================================
-    // KONFIRMASI FAILS & SUBMIT
-    // ==========================================
-    function confirmFailsAndSubmit() {
-        closeConfirmFailsModal();
-        submitForm();
-    }
-
-    // ==========================================
-    // KONFIRMASI DEALS & SUBMIT
-    // ==========================================
-    function confirmDealsAndSubmit() {
-        closeConfirmDealsModal();
-        submitForm();
-    }
-
-    // ==========================================
-    // CLOSE MODAL KONFIRMASI
-    // ==========================================
-    function closeConfirmFailsModal() {
-        document.getElementById('confirmFailsModal').classList.remove('active');
-    }
-
-    function closeConfirmDealsModal() {
-        document.getElementById('confirmDealsModal').classList.remove('active');
     }
 
     // ==========================================
@@ -594,6 +482,7 @@
         // Append data dari form kiri
         formData.append('pic_id', document.getElementById('pic_id').value);
         formData.append('pic_name', document.getElementById('pic_name').value);
+        formData.append('keterangan', document.getElementById('keterangan').value);
         formData.append('status', statusFails.checked ? 'Fails' : 'Deals');
         
         // Hanya append data kanan jika DEALS
@@ -601,7 +490,6 @@
             formData.append('nilai_proyek', document.getElementById('nilai_proyek').value);
             formData.append('tanggal_mulai_kerja', document.getElementById('tanggal_mulai_kerja').value);
             formData.append('tanggal_selesai_kerja', document.getElementById('tanggal_selesai_kerja').value);
-            formData.append('keterangan', document.getElementById('keterangan').value);
             
             if (document.getElementById('bukti_spk').files.length > 0) {
                 formData.append('bukti_spk', document.getElementById('bukti_spk').files[0]);
@@ -975,17 +863,9 @@
     // ==========================================
     window.addEventListener('click', function(event) {
         const modal = document.getElementById('transaksiModal');
-        const confirmFailsModal = document.getElementById('confirmFailsModal');
-        const confirmDealsModal = document.getElementById('confirmDealsModal');
         
         if (event.target === modal) {
             modal.classList.remove('active');
-        }
-        if (event.target === confirmFailsModal) {
-            confirmFailsModal.classList.remove('active');
-        }
-        if (event.target === confirmDealsModal) {
-            confirmDealsModal.classList.remove('active');
         }
     });
 </script>
