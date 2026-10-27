@@ -14,8 +14,10 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\SalesVisitController;
 use App\Http\Controllers\PicController;
 use App\Http\Controllers\TransaksiController;
+use App\Http\Controllers\RabController;
 use App\Http\Controllers\SalesPerformanceController;
 use App\Http\Controllers\PipelineController;
+use App\Http\Controllers\TrendPageController;
 use App\http\Controllers\SalesVisitTrendController;
 
 // ==========================
@@ -138,6 +140,19 @@ Route::middleware(['auth', 'permission'])->group(function () {
     Route::put('/transaksi/{id}', [TransaksiController::class, 'update'])->name('transaksi.update');
     Route::delete('/transaksi/{id}', [TransaksiController::class, 'destroy'])->name('transaksi.destroy');
 
+        // ==========================
+    // RAB ROUTES
+    // ==========================
+       Route::get('/rab', [RabController::class, 'index'])->name('rab');
+    Route::get('/rab/create', [RabController::class, 'create'])->name('rab.create');
+    Route::get('/rab/export/pdf', [\App\Http\Controllers\RabPdfController::class, 'unduh'])->name('rab.pdf.list');
+    Route::post('/rab', [RabController::class, 'store'])->name('rab.store');
+    Route::get('/rab/{id}', [RabController::class, 'show'])->whereNumber('id')->name('rab.show');
+    Route::get('/rab/{id}/edit', [RabController::class, 'edit'])->whereNumber('id')->name('rab.edit');
+    Route::get('/rab/{id}/pdf', [\App\Http\Controllers\RabPdfController::class, 'satu'])->whereNumber('id')->name('rab.pdf');
+    Route::put('/rab/{id}', [RabController::class, 'update'])->whereNumber('id')->name('rab.update');
+    Route::delete('/rab/{id}', [RabController::class, 'destroy'])->whereNumber('id')->name('rab.destroy');
+    
     // ==========================
     // PIC Management
     // ==========================
