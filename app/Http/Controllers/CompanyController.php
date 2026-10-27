@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\CompanyPivotExport;
 
 class CompanyController extends Controller
 {
@@ -21,7 +24,6 @@ class CompanyController extends Controller
         $user = Auth::user();
         $companiesQuery = Company::with('companyType', 'user');
 
-        // Role-based filtering
         if ($user->role_id == 1) {
             // superadmin - all data
         } elseif (in_array($user->role_id, [7, 11])) {
@@ -34,7 +36,6 @@ class CompanyController extends Controller
             $companiesQuery->whereNull('company_id');
         }
 
-        // KPI calculations
         $totalCompanies = (clone $companiesQuery)->count();
         $jenisCompanies = (clone $companiesQuery)->distinct('company_type_id')->count('company_type_id');
         $tierCompanies = (clone $companiesQuery)->distinct('tier')->count('tier');
@@ -74,9 +75,6 @@ class CompanyController extends Controller
         }
     }
 
-    /**
-     * Get districts by regency ID
-     */
     public function getDistricts($regency_id)
     {
         try {
@@ -96,9 +94,6 @@ class CompanyController extends Controller
         }
     }
 
-    /**
-     * Get villages by district ID
-     */
     public function getVillages($district_id)
     {
         try {
@@ -118,9 +113,6 @@ class CompanyController extends Controller
         }
     }
 
-    /**
-     * Get PICs for a company (for edit modal)
-     */
     public function getCompanyPics($id)
     {
         try {
@@ -148,7 +140,6 @@ class CompanyController extends Controller
             ], 500);
         }
     }
-
 
     public function search(Request $request)
     {
@@ -210,7 +201,6 @@ class CompanyController extends Controller
         ]);
     }
 
-    // 🔥 UPDATED: Show with ALL fields
     public function show($id)
     {
         try {
@@ -238,21 +228,15 @@ class CompanyController extends Controller
                     'description' => $company->description ?? '-',
                     'status' => $company->status,
                     'created_by' => $company->user->name ?? '-',
-                    
-                    // 🔥 Address IDs (for edit)
                     'province_id' => $company->province_id,
                     'regency_id' => $company->regency_id,
                     'district_id' => $company->district_id,
                     'village_id' => $company->village_id,
-                    
-                    // 🔥 Address Names (for display)
                     'province' => $company->province->name ?? '-',
                     'regency' => $company->regency->name ?? '-',
                     'district' => $company->district->name ?? '-',
                     'village' => $company->village->name ?? '-',
                     'full_address' => $company->address ?? '-',
-                    
-                    // 🔥 Contact & Media
                     'company_phone' => $company->phone ?? '-',
                     'company_email' => $company->email ?? '-',
                     'company_website' => $company->website ?? null,
@@ -280,7 +264,6 @@ class CompanyController extends Controller
         }
     }
 
-    // 🔥 UPDATED: Store with ALL fields
     public function store(Request $request)
     {
         \Log::info('📥 Store Request:', $request->all());
@@ -291,23 +274,17 @@ class CompanyController extends Controller
             'tier' => 'nullable|string|in:A,B,C,D',
             'description' => 'nullable|string',
             'status' => 'required|in:active,inactive',
-            
-            // 🔥 Address validation
             'province_id' => 'nullable|string|max:255',
             'regency_id' => 'nullable|string|max:255',
             'district_id' => 'nullable|string|max:255',
             'village_id' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            
-            // 🔥 Contact & Media validation
             'company_phone' => 'nullable|string|max:255',
             'company_email' => 'nullable|email|max:255',
             'company_website' => 'nullable|url|max:255',
             'company_linkedin' => 'nullable|url|max:255',
             'company_instagram' => 'nullable|string|max:255',
             'company_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
-            
-            // 🔥 PICs validation
             'pics' => 'nullable|array',
             'pics.*.pic_name' => 'required_with:pics|string|max:255',
             'pics.*.position' => 'nullable|string|max:255',
@@ -318,14 +295,12 @@ class CompanyController extends Controller
         try {
             DB::beginTransaction();
 
-            // 🔥 Handle logo upload
             $logoPath = null;
             if ($request->hasFile('company_logo')) {
                 $logoPath = $request->file('company_logo')->store('company_logos', 'public');
                 \Log::info('✅ Logo uploaded:', ['path' => $logoPath]);
             }
 
-            // Create company
             $company = Company::create([
                 'company_name' => $validated['company_name'],
                 'company_type_id' => $validated['company_type_id'],
@@ -333,15 +308,11 @@ class CompanyController extends Controller
                 'description' => $validated['description'] ?? null,
                 'status' => $validated['status'],
                 'user_id' => auth()->id(),
-                
-                // 🔥 Address fields
                 'address' => $validated['address'] ?? null,
                 'province_id' => $validated['province_id'] ?? null,
                 'regency_id' => $validated['regency_id'] ?? null,
                 'district_id' => $validated['district_id'] ?? null,
                 'village_id' => $validated['village_id'] ?? null,
-                
-                // 🔥 Contact & Media fields
                 'phone' => $validated['company_phone'] ?? null,
                 'email' => $validated['company_email'] ?? null,
                 'website' => $validated['company_website'] ?? null,
@@ -352,7 +323,6 @@ class CompanyController extends Controller
             
             \Log::info('✅ Company created:', ['company_id' => $company->company_id]);
             
-            // 🔥 Create PICs
             if ($request->has('pics') && is_array($request->pics)) {
                 foreach ($request->pics as $index => $picData) {
                     if (empty($picData['pic_name'])) {
@@ -385,7 +355,6 @@ class CompanyController extends Controller
         }
     }
 
-    // 🔥 UPDATED: Update with ALL fields
     public function update(Request $request, $id)
     {
         \Log::info('📝 Update Request:', $request->all());
@@ -398,23 +367,17 @@ class CompanyController extends Controller
             'tier' => 'nullable|string|in:A,B,C,D',
             'description' => 'nullable|string',
             'status' => 'required|in:active,inactive',
-            
-            // 🔥 Address validation
             'province_id' => 'nullable|string|max:255',
             'regency_id' => 'nullable|string|max:255',
             'district_id' => 'nullable|string|max:255',
             'village_id' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            
-            // 🔥 Contact & Media validation
             'company_phone' => 'nullable|string|max:255',
             'company_email' => 'nullable|email|max:255',
             'company_website' => 'nullable|url|max:255',
             'company_linkedin' => 'nullable|url|max:255',
             'company_instagram' => 'nullable|string|max:255',
             'company_logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
-            
-            // 🔥 PICs validation
             'pics' => 'nullable|array',
             'pics.*.pic_name' => 'required_with:pics|string|max:255',
             'pics.*.position' => 'nullable|string|max:255',
@@ -425,10 +388,8 @@ class CompanyController extends Controller
         try {
             DB::beginTransaction();
 
-            // 🔥 Handle logo upload
             $logoPath = $company->logo;
             if ($request->hasFile('company_logo')) {
-                // Delete old logo
                 if ($company->logo) {
                     Storage::disk('public')->delete($company->logo);
                 }
@@ -436,22 +397,17 @@ class CompanyController extends Controller
                 \Log::info('✅ Logo updated:', ['path' => $logoPath]);
             }
 
-            // Update company
             $company->update([
                 'company_name' => $validated['company_name'],
                 'company_type_id' => $validated['company_type_id'],
                 'tier' => $validated['tier'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'status' => $validated['status'],
-                
-                // 🔥 Address fields
                 'address' => $validated['address'] ?? null,
                 'province_id' => $validated['province_id'] ?? null,
                 'regency_id' => $validated['regency_id'] ?? null,
                 'district_id' => $validated['district_id'] ?? null,
                 'village_id' => $validated['village_id'] ?? null,
-                
-                // 🔥 Contact & Media fields
                 'phone' => $validated['company_phone'] ?? null,
                 'email' => $validated['company_email'] ?? null,
                 'website' => $validated['company_website'] ?? null,
@@ -462,7 +418,6 @@ class CompanyController extends Controller
             
             \Log::info('✅ Company updated:', ['company_id' => $company->company_id]);
             
-            // 🔥 Delete old PICs and create new
             CompanyPic::where('company_id', $company->company_id)->delete();
             
             if ($request->has('pics') && is_array($request->pics)) {
@@ -592,63 +547,200 @@ class CompanyController extends Controller
         return $actions;
     }
 
-
-    
-public function storeCompanyAjax(Request $request)
-{
-    // ✅ Force JSON response
-    $request->headers->set('Accept', 'application/json');
-    
-    \Log::info('🔥 AJAX Company Store Request:', $request->all());
-    
-    try {
-        $validated = $request->validate([
-            'company_name' => 'required|string|max:255',
-            'company_type_id' => 'required|exists:company_type,company_type_id',
-            'tier' => 'nullable|in:A,B,C,D',
-            'status' => 'nullable|in:active,inactive',
-            'description' => 'nullable|string',
-        ]);
-
-        $company = Company::create([
-            'company_name' => $validated['company_name'],
-            'company_type_id' => $validated['company_type_id'],
-            'tier' => $validated['tier'] ?? null,
-            'status' => $validated['status'] ?? 'active',
-            'description' => $validated['description'] ?? null,
-            'user_id' => auth()->id(),
-        ]);
-
-        \Log::info('✅ Company created via AJAX:', ['company_id' => $company->company_id]);
-
-        // ✅ EXPLICIT JSON RESPONSE
-        return response()->json([
-            'success' => true,
-            'message' => 'Company berhasil ditambahkan',
-            'company' => [
-                'id' => $company->company_id,
-                'name' => $company->company_name
-            ]
-        ], 200, ['Content-Type' => 'application/json']);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        \Log::error('❌ Validation error:', $e->errors());
-        return response()->json([
-            'success' => false,
-            'message' => 'Validasi gagal',
-            'errors' => $e->errors()
-        ], 422, ['Content-Type' => 'application/json']);
-
-    } catch (\Exception $e) {
-        \Log::error('❌ Error creating company via AJAX:', [
-            'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
+    public function storeCompanyAjax(Request $request)
+    {
+        $request->headers->set('Accept', 'application/json');
         
-        return response()->json([
-            'success' => false,
-            'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-        ], 500, ['Content-Type' => 'application/json']);
+        \Log::info('🔥 AJAX Company Store Request:', $request->all());
+        
+        try {
+            $validated = $request->validate([
+                'company_name' => 'required|string|max:255',
+                'company_type_id' => 'required|exists:company_type,company_type_id',
+                'tier' => 'nullable|in:A,B,C,D',
+                'status' => 'nullable|in:active,inactive',
+                'description' => 'nullable|string',
+            ]);
+
+            $company = Company::create([
+                'company_name' => $validated['company_name'],
+                'company_type_id' => $validated['company_type_id'],
+                'tier' => $validated['tier'] ?? null,
+                'status' => $validated['status'] ?? 'active',
+                'description' => $validated['description'] ?? null,
+                'user_id' => auth()->id(),
+            ]);
+
+            \Log::info('✅ Company created via AJAX:', ['company_id' => $company->company_id]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Company berhasil ditambahkan',
+                'company' => [
+                    'id' => $company->company_id,
+                    'name' => $company->company_name
+                ]
+            ], 200, ['Content-Type' => 'application/json']);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('❌ Validation error:', $e->errors());
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $e->errors()
+            ], 422, ['Content-Type' => 'application/json']);
+
+        } catch (\Exception $e) {
+            \Log::error('❌ Error creating company via AJAX:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500, ['Content-Type' => 'application/json']);
+        }
     }
-}
+
+    public function exportPdf($id)
+    {
+        $company = Company::with(['companyType', 'province', 'regency', 'district', 'village'])->findOrFail($id);
+        $pics = CompanyPic::where('company_id', $id)->orderBy('pic_name')->get();
+
+        $logoPath = null;
+        if ($company->logo) {
+            $fullPath = storage_path('app/public/' . $company->logo);
+            if (file_exists($fullPath)) {
+                $logoPath = $fullPath;
+            }
+        }
+
+        $inotalLogoPath = public_path('img/LOGO INOTAL UNTUK BG TERANG.png');
+        if (!file_exists($inotalLogoPath)) {
+            $inotalLogoPath = null;
+        }
+
+        $documentNumber = 'INOTAL/RS/' . now()->format('Y') . '/' . str_pad($company->company_id, 4, '0', STR_PAD_LEFT);
+
+        $pdf = Pdf::loadView('pages.company-pdf', compact('company', 'pics', 'logoPath', 'inotalLogoPath', 'documentNumber'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Informasi-RS-' . str_replace(' ', '-', $company->company_name) . '.pdf');
+    }
+
+    public function exportPdfList(Request $request)
+    {
+        $query = Company::with('companyType');
+
+        if ($request->filled('type_id')) {
+            $query->where('company_type_id', $request->type_id);
+        }
+
+        if ($request->filled('tier')) {
+            $query->where('tier', $request->tier);
+        }
+
+        $companies = $query->orderBy('company_name')->get();
+
+        $typeLabel = 'Semua Tipe';
+        if ($request->filled('type_id')) {
+            $type = CompanyType::find($request->type_id);
+            $typeLabel = $type->type_name ?? 'Semua Tipe';
+        }
+
+        $tierLabel = $request->filled('tier') ? 'Tier ' . $request->tier : 'Semua Tier';
+
+        $inotalLogoPath = public_path('img/LOGO INOTAL UNTUK BG TERANG.png');
+        if (!file_exists($inotalLogoPath)) {
+            $inotalLogoPath = null;
+        }
+
+        $documentNumber = 'INOTAL/RS-LIST/' . now()->format('Y') . '/' . now()->format('mdHis');
+
+        $pdf = Pdf::loadView('pages.company-pdf-list', compact('companies', 'typeLabel', 'tierLabel', 'inotalLogoPath', 'documentNumber'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Daftar-Rumah-Sakit-' . now()->format('Ymd') . '.pdf');
+    }
+
+    public function exportPdfSelected(Request $request)
+    {
+        $ids = explode(',', $request->query('ids', ''));
+        $ids = array_filter($ids);
+
+        $companies = Company::with('companyType')
+            ->whereIn('company_id', $ids)
+            ->orderBy('company_name')
+            ->get();
+
+        $typeLabel = 'Pilihan Manual';
+        $tierLabel = $companies->count() . ' Rumah Sakit Terpilih';
+
+        $inotalLogoPath = public_path('img/LOGO INOTAL UNTUK BG TERANG.png');
+        if (!file_exists($inotalLogoPath)) {
+            $inotalLogoPath = null;
+        }
+
+        $documentNumber = 'INOTAL/RS-LIST/' . now()->format('Y') . '/' . now()->format('mdHis');
+
+        $pdf = Pdf::loadView('pages.company-pdf-list', compact('companies', 'typeLabel', 'tierLabel', 'inotalLogoPath', 'documentNumber'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Daftar-RS-Pilihan-' . now()->format('Ymd') . '.pdf');
+    }
+
+    public function exportPivotExcel()
+    {
+        $tiers = Company::select('tier')
+            ->whereNotNull('tier')
+            ->distinct()
+            ->orderBy('tier')
+            ->pluck('tier')
+            ->toArray();
+
+        $data = [];
+        $data[] = array_merge(['Keterangan'], $tiers, ['Grand Total']);
+
+        $rowTotal = ['Jumlah Perusahaan'];
+        $rowActive = ['active'];
+        $rowInactive = ['inactive'];
+        $rowPic = ['Total PIC'];
+
+        $grandTotal = 0;
+        $grandActive = 0;
+        $grandInactive = 0;
+        $grandPic = 0;
+
+        foreach ($tiers as $tier) {
+            $companyIds = Company::where('tier', $tier)->pluck('company_id');
+
+            $total = $companyIds->count();
+            $active = Company::where('tier', $tier)->where('status', 'active')->count();
+            $inactive = Company::where('tier', $tier)->where('status', 'inactive')->count();
+            $pic = CompanyPic::whereIn('company_id', $companyIds)->count();
+
+            $rowTotal[] = $total;
+            $rowActive[] = $active;
+            $rowInactive[] = $inactive;
+            $rowPic[] = $pic;
+
+            $grandTotal += $total;
+            $grandActive += $active;
+            $grandInactive += $inactive;
+            $grandPic += $pic;
+        }
+
+        $rowTotal[] = $grandTotal;
+        $rowActive[] = $grandActive;
+        $rowInactive[] = $grandInactive;
+        $rowPic[] = $grandPic;
+
+        $data[] = $rowTotal;
+        $data[] = $rowActive;
+        $data[] = $rowInactive;
+        $data[] = $rowPic;
+
+        return Excel::download(new CompanyPivotExport($data), 'Pivot-Company-' . now()->format('Ymd') . '.xlsx');
+    }
 }

@@ -108,11 +108,11 @@ document.addEventListener('click', function(event) {
 <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 sidebar-overlay opacity-0 pointer-events-none transition-all duration-300"></div>
 
 <!-- Sidebar -->
-<div id="sidebar" class="fixed left-0 top-0 h-full w-80 bg-white shadow-2xl z-40 sidebar closed flex flex-col">
+<div id="sidebar" class="fixed left-0 top-0 h-screen w-80 bg-white shadow-2xl z-40 sidebar closed flex flex-col" style="height: 100dvh;">
     <!-- Scrollable Menu Area -->
-    <div class="flex-1 overflow-y-auto p-6 pb-0">
+    <div class="flex-1 min-h-0 overflow-y-auto px-6 pt-20 pb-0">
         <!-- Sidebar Header -->
-        <div class="flex items-center justify-between mb-8">
+       <div class="flex items-center justify-between mb-4">
             <button id="sidebarClose" class="text-gray-400 hover:text-gray-600 transition-colors">
                 <i class="fas fa-times text-xl"></i>
             </button>
